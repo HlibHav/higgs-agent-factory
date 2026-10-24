@@ -428,7 +428,7 @@ DAG levels: 0 → {L1, L2, L3r, L3c} → J → L4. *Cuttable* steps: 6b, 13b, 17
 
 19b. *cuttable*: scripted-only filter — turns green AC-48; `ttfa_summary` keeps only `kind == "scripted"`; lane L3c; files `factory/gate/metrics.py`; skills: none — project rules only; verify `uv run pytest -m "not live" tests/test_metrics.py -k ac48` → passed
 
-20b. *cuttable, waits on answer (p50+max or p50+p95)*: barge-in aggregate — turns green AC-29; `bargein_summary(turns) -> BargeinSummary(...)` excluding "not measured"; lane L3c; files `factory/gate/metrics.py`; skills: none — project rules only; verify `uv run pytest -m "not live" tests/test_metrics.py -k ac29` → passed
+20b. *cuttable; answered by Glib 2026-10-24: p50 + max with N (spec AC-54)*: barge-in aggregate — turns green AC-29 and AC-54; `bargein_summary(turns) -> BargeinSummary(p50_ms, max_ms, n)` excluding "not measured" turns (verify example from AC-54: 200, 300, 900 ms plus one "not measured" → p50 300, max 900, N 3); lane L3c; files `factory/gate/metrics.py`; skills: none — project rules only; verify `uv run pytest -m "not live" tests/test_metrics.py -k "ac29 or ac54"` → passed
 
 21. backend factory: cost
    - files: `factory/gate/cost.py`, `factory/gate/render.py` (new)

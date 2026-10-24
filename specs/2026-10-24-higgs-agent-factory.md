@@ -115,6 +115,7 @@ means a run against the live Boson API (the `live` marker, spends credits).
 - AC-48 The system shall compute the Eval Card's TTFA p50 and p95 from scripted gate-run turns only, never from live-session turns. — proof: red-first unit — verify: store a run with 10 scripted and 5 live TTFA values; expect n = 10 and percentiles from the scripted values only
 - AC-28 WHEN an interrupting user turn is played over assistant audio, the system shall record barge-in stop time from the client sending the first interrupting audio chunk to the receipt of the last `response.output_audio.delta` carrying the interrupted response's id before its `response.done` (F17). — proof: red-first integration — verify: fake server keeps sending deltas for 250 ms after interruption audio starts, then sends `response.done` cancelled; expect about 250 ms
 - AC-29 IF the interrupted response's `response.done` has status `completed`, or no `response.done` for it arrives before the scenario ends, or its last audio delta arrived before the interrupting audio started, THEN the system shall record that turn's barge-in stop time as "not measured" and leave it out of the card's aggregate. — proof: red-first unit — verify: one interruption ends `completed`, one has no `response.done`, one whose last delta precedes the interruption; expect all three "not measured" and the aggregate computed from the rest
+- AC-54 WHEN an Eval Card is produced, the system shall show barge-in stop time as p50 and max over the measured interruptions, together with their count N, excluding "not measured" turns. — proof: red-first unit — verify: feed measured values 200, 300, 900 ms plus one "not measured"; expect p50 300 ms, max 900 ms, N = 3
 
 ### Cost (L3)
 - AC-30 WHEN an Eval Card is produced, the system shall show the estimated audio cost as measured input audio minutes times the F12 audio-input rate plus measured output audio minutes times the F12 audio-output rate, with both minute counts shown and the label "estimated from Boson's published per-minute rates". — proof: red-first unit — verify: 2.0 input minutes and 1.5 output minutes; expect 2.0 × the F12 audio-input rate + 1.5 × the F12 audio-output rate, and the label
@@ -169,7 +170,7 @@ means a run against the live Boson API (the `live` marker, spends credits).
 | R-18 | Tolerate unknown events (F5) | `docs/boson-protocol.md` F5 | AC-24 |
 | R-19 | TTFA p50/p95 client-side, end of user input → first `response.output_audio.delta` | brief | AC-47, AC-25, AC-27, AC-48 |
 | R-20 | While a live session runs, record TTFA per turn | brief | AC-26, AC-41 |
-| R-21 | Barge-in stop time on the Eval Card | brief | AC-28, AC-29 |
+| R-21 | Barge-in stop time on the Eval Card | brief | AC-28, AC-29, AC-54 |
 | R-22 | Cost: estimated audio cost from F12 rates × measured minutes; token cost "not measurable (F2)"; nothing presented as billed | brief; Glib, cost framing | AC-30, AC-31, AC-32 |
 | R-30 | Measured token cost from reported usage × F12 token rates as the headline when every response reported usage; audio estimate kept as a separate line | Glib, 2026-10-24 after live smoke (F2 wire observation) | AC-50, AC-51, AC-31 |
 | R-31 | Demo step 2: full Eval Card from a prior run (run id, time) plus one scenario run live | Glib, 2026-10-24 | AC-52, AC-53 |
@@ -406,7 +407,7 @@ Anything else is an invalid reply (AC-18).
 | failing rubric lines | for each non-PASS scenario | AC-12 |
 | IHBench RQ pass rate | labelled "model-level, IHBench samples", with source and date; or "not available" | Spec B output (AC-34) |
 | TTFA p50 / p95, n | scripted turns only (AC-48), client-side, last user speech chunk sent → first `response.output_audio.delta` (F17); label notes the VAD silence window (F8) | AC-25, AC-27 |
-| barge-in stop time | per interruption and aggregate [NEEDS CLARIFICATION: aggregate as p50 and max, or p50 and p95?]; "not measured" turns excluded | AC-28, AC-29 |
+| barge-in stop time | per interruption, and aggregate as p50 and max with N measured interruptions; "not measured" turns excluded | AC-28, AC-29, AC-54 |
 | audio minutes | input and output, measured | client byte counts |
 | estimated audio cost | input min × F12 input rate + output min × F12 output rate, labelled "estimated from Boson's published per-minute rates" | AC-30 |
 | estimated audio cost per minute | estimated audio cost ÷ [NEEDS CLARIFICATION: denominator — total session minutes or total audio minutes?] | AC-30 |
@@ -454,7 +455,7 @@ Training is the P1 template and carries the AC-5 budget.
 
 - **L1 schema + generator:** Agent Spec contract, schema validation, templates, brief → spec. AC-1…AC-7, AC-46.
 - **L2 runtime on `pipecat-boson`** (the reuse decision in `docs/reuse-map.md`): session from an Agent Spec, mocked tools, server `web_search`, live session limit, event tolerance. AC-20…AC-22, AC-24, AC-26, AC-35.
-- **L3 eval runner + judge + Eval Card:** TTS cache, paced scenario playback, timing, judge, verdict, cost, card storage. AC-8…AC-19, AC-23, AC-25, AC-27…AC-34, AC-45, AC-47, AC-48, AC-50, AC-51.
+- **L3 eval runner + judge + Eval Card:** TTS cache, paced scenario playback, timing, judge, verdict, cost, card storage. AC-8…AC-19, AC-23, AC-25, AC-27…AC-34, AC-45, AC-47, AC-48, AC-50, AC-51, AC-54.
 - **L4 demo page (P2):** AC-36…AC-44, AC-49, AC-52, AC-53.
 - **L5 avatar (P3):** F11; no ACs yet (non-goal of this draft).
 
@@ -468,7 +469,6 @@ Training is the P1 template and carries the AC-5 budget.
 - [NEEDS CLARIFICATION: is a refused voice at session start (AC-20) labelled `rejected` or `incomplete`?] — non-blocking, blocks AC-20 wording
 - [NEEDS CLARIFICATION: does a missing expected tool call force a scenario below PASS regardless of the judge (AC-23)?] — non-blocking
 - [NEEDS CLARIFICATION: how a server `web_search` call (F10) counts against an expected tool call] — non-blocking, AC-23
-- [NEEDS CLARIFICATION: barge-in aggregate on the card: p50 and max, or p50 and p95?] — non-blocking
 - [NEEDS CLARIFICATION: denominator of "estimated audio cost per minute": session minutes or audio minutes?] — non-blocking, AC-30
 - [NEEDS CLARIFICATION: card texts of the four non-P1 solution templates (boson.ai/solutions)] — non-blocking, AC-3
 - [NEEDS CLARIFICATION: Realtime voice preset list; F7 names presets without listing them, F22 lists TTS presets only] — non-blocking, AC-20
@@ -533,6 +533,7 @@ Training is the P1 template and carries the AC-5 budget.
 | AC-51 | red-first unit | usage on every response → token cost headline, audio estimate separate line | — | — | — |
 | AC-52 | browser (main session) | gate step → stored full card with run id and timestamp | — | — | — |
 | AC-53 | red-first integration | stored `rejected` + one live PASS → "single-scenario check", verdict still `rejected` | — | — | — |
+| AC-54 | red-first unit | 200, 300, 900 ms + one "not measured" → p50 300, max 900, N = 3 | — | — | — |
 
 ## Changelog
 
@@ -541,3 +542,4 @@ Training is the P1 template and carries the AC-5 budget.
 | 2026-10-24 | Created as draft (Full SDD). Folds in Glib's answers: gate = every scenario PASS, RQ/TTFA/barge-in informational, cut-short run `incomplete` (Q1); user turns via Higgs TTS 3 with recordings as fallback (Q2, F22); budget limits required in the Agent Spec with Specialist Training defaults and a 1,000-character brief cap (Q3); estimated-audio-cost framing with token cost "not measurable (F2)"; judge vendor Anthropic. | create → answers mode, spec-creator |
 | 2026-10-24 | Cost: measured token cost (AC-50) is the headline when every response reported usage, audio estimate stays a separate line (AC-51); AC-31 now applies only when some response lacked usage; non-goal and NFR wording that called token cost never measurable removed. AC-36: live talk with a non-released agent allowed with a "not released" label. Demo step 2: stored full card plus one live scenario (AC-52, AC-53). Two markers closed, one added (cached-token counting). | Live smoke `results/smoke-20261024T145225Z.jsonl` showed `usage` populated on a text-mode `response.done` (F2 docs vs wire); Glib's answers on cost, AC-36 and demo timing. update mode |
 | 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word. |
+| 2026-10-24 | Barge-in aggregate on the Eval Card fixed as p50 and max with N, "not measured" turns excluded; AC-54 added; marker closed. Status left as approved. | Glib's answer: on 3–6 points p95 equals max but reads as statistics that are not there; max with N is more honest. update mode |
