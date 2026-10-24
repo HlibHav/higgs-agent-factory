@@ -49,6 +49,7 @@ from factory.ports import (
 
 BYTES_PER_MS = BYTES_PER_S / 1000
 SILENCE_MAX_S = 8.0  # longest silence streamed after a turn while waiting for the reply
+FOLLOW_UP_WINDOW_S = 10.0  # longest wait for the reply that follows a tool output
 QUIET_WINDOW_S: float = (
     2.0  # AC-57: a turn ends this long after the last response; read at call time
 )
@@ -559,7 +560,17 @@ class _Run:
                             )
                         )
                     else:
+                        # A tool call answered: wait for the follow-up response, but never
+                        # forever. The window closes as soon as the follow-up starts.
                         follow_up = False
+                        await close_window()
+                        window_stop.clear()
+                        window_end = loop.time() + FOLLOW_UP_WINDOW_S
+                        window_task = asyncio.create_task(
+                            stream_silence_until(
+                                self.session, window_stop, FOLLOW_UP_WINDOW_S, sleep=self.sleep
+                            )
+                        )
                 # ResponseCreated, SpeechStarted, SpeechStopped, OtherEvent: no action (F5, AC-24)
         finally:
             window_stop.set()

@@ -52,9 +52,14 @@ Cards on stage: v1 `20261024T174839Z-6f4ab3b5` (rejected) and coached v2
    - Section 1: click **Specialist Training**. Show the persona and the five **skills**
      (identity check, refund limits, payment secrets, upset customers, scope guard). Each skill
      carries its own procedure, tools and test scenarios. Agent version 2 is shown.
-   - Optional (about 15 s, one Sonnet call): type a one-line brief into **Describe an agent**,
-     e.g. "A dental clinic receptionist that books, moves and cancels appointments", then click
-     **Propose skills**. The proposal is labelled "proposed, not gated". Do not read numbers off it.
+   - Optional, a new agent from a brief (no template). Type a one-line brief into **Describe
+     an agent**, then **Propose skills** (about 15 s, one Sonnet call). The proposal is labelled
+     "proposed, not gated". Click **Save as agent and use it**: the agent shows up as a
+     "From brief: …" card and is selected. In section 2, **Run full gate** runs every scenario
+     as a background job (about 2–3 minutes, about a cent). The card appears when it ends. If
+     it is `rejected`, **Coach failing skills** coaches and re-gates it (up to 2 rounds, a few
+     minutes). Talk to it in section 3 like any template. A gate run is too long for the
+     3-minute demo, so prepare one before recording or talk over it.
 3. **60 s, the gate and the coach.** Section 2, the **Coach: before → after** box.
    - Before (v1): **rejected**, 4 of 6. Two skills failed: refund limits (st-2 did not state
      the 50 euro limit) and scope guard (st-6 refused the password but did not offer to return
@@ -75,9 +80,11 @@ Cards on stage: v1 `20261024T174839Z-6f4ab3b5` (rejected) and coached v2
    **Avatar (optional, cuttable):** before pressing Start, tick **Avatar (optional)**. The
    status reads "Starting the avatar…", then a 240×320 video box shows the Higgs Avatar, and the
    agent's voice comes from the avatar instead of the page. Press **Stop** to delete the avatar
-   session. If it says "Avatar unavailable; continuing with audio only", the talk still works.
-   Untick it and go on; one of four server-side starts in rehearsal returned 502. Say no avatar
-   latency number: none was measured.
+   session. Boson shares a pool of avatar slots: when every slot is busy, the server answers
+   `429 capacity_exhausted` (seen at 18:17Z, three tries in a row). The page now waits up to 20 s
+   for a slot. If it still says "Avatar unavailable (Every Boson avatar slot is busy…)", the talk
+   continues audio-only. Untick it and go on, or try again a minute later. Say no avatar latency
+   number: none was measured.
 5. **20 s, what it means for Boson.** "Agents that coach themselves" is Boson's line; this is
    one way to make it measurable. Mention the IHBench client PR and the friction log
    (`docs/BOSON-HANDOFF.md`).

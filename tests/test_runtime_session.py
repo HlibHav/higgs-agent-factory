@@ -345,7 +345,7 @@ def test_ac22_tool_output_sent() -> None:
         "client",
     )
     assert calls[0].arguments == {"id": "P-1"}
-    assert _types(received) == ["session.update", "conversation.item.create"]
+    assert _types(received)[:3] == ["session.update", "conversation.item.create", "response.create"]
     created = received[1].event["item"]
     assert created["type"] == "function_call_output"
     assert created["call_id"] == "call-1"
