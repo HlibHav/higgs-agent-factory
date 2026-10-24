@@ -1,6 +1,6 @@
 # Status
 
-Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude Code) on branch `feat/skills-coach-avatar` (worktree `.claude/worktrees/skills-coach-avatar`). Verified by: `uv run pytest -m "not live" -q` → `267 passed, 1 deselected`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `95 files already formatted`; `uv run mypy` → `Success: no issues found in 35 source files`.
+Last refreshed: 2026-10-24T19:05:00Z by the setup session (Claude Code) on `docs/readme-product` — verified by: `uv run pytest -m "not live"` → `274 passed, 1 deselected`; `uv run mypy` → `Success: no issues found in 35 source files` (on `main` at `9e69a68`, pushed).
 
 ## New on main (merged 2026-10-24 ~18:12Z, `0faed07`)
 
@@ -13,7 +13,7 @@ Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude 
 - Research: `docs/research/2026-10-24-generator-evals.md` (generator evaluation not implemented).
 - Page checked in the built-in browser on port 8012: skills, v2 card with per-skill table, judge agreement, coach diff, avatar checkbox; no console errors.
 
-## New on `feat/brief-agents-on-page` (2026-10-24 ~18:36Z, not merged)
+## Brief agents on the page (merged into `main` as `9e69a68`, pushed)
 
 - Brief agents on the page (AC-81…AC-84). **Propose skills** → **Save as agent and use it** (the server keeps the proposal and refuses server tools) → the "From brief: …" card → **Run full gate** / **Coach failing skills** as background jobs → live talk. Checked in the browser on :8012 with `brief-onboarding-buddy-b948ed`: v1 rejected 5/6 → coach 2 rounds → v3 rejected 5/6 (`docs/CLAIMS.md`).
 - Fix: after a mocked tool output the client now sends `response.create` (F29), and the runner waits at most 10 s for the follow-up. Before this, any tool scenario hung the gate. No tool-using template had been live-gated before.
@@ -25,12 +25,14 @@ Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude 
 - P2 demo page: `uv run python -m factory serve --port 8000` (keys from env, 127.0.0.1 only). Checked in the browser: five template cards, Agent Spec on click, stored Eval Card with run id and timestamp, single-scenario check live (st-1 → PASS, TTFA 740 ms, marked "single-scenario check", stored verdict still REJECTED; checked against the earlier card). Live session checked through `/ws/live/specialist-training` with a scripted client and cached TTS audio: `ready` with `released: false`, assistant audio and transcript returned, live TTFA 499 ms from `speech_stopped`. Not checked by an agent: a real microphone in the browser and barge-in playback stop (AC-42) — Glib checks this with headphones before recording.
 - Four more templates (Health Insurance, Fraud Detection, Customer Support, AI Receptionist): AC-3 green offline. Rubrics NOT reviewed by Glib (`docs/templates-review.md`); no live gate run.
 - Review loop closed for both plans: `docs/plans/*.state.md`, `docs/plans/*.verify.md`, spec Traceability tables filled. Fixed: AC-29 barge-in counted only for a cancelled response; env read moved to the composition root; IHBench client wraps sends in close handling and bounds the close handshake.
-- P0 IHBench client (fork): `feat/higgs-realtime-client` at `abd6bd9`, tests at `0d73f72`; `54 passed` on websockets 17.3 and 12.0; footprint 3 files; both branches pushed to HlibHav/ihbench (draft PR HlibHav/ihbench#1).
+- P0 IHBench client (fork): `feat/higgs-realtime-client` at `abd6bd9`, tests at `0d73f72`; `54 passed` on websockets 17.3 and 12.0; footprint 3 files; both branches pushed to HlibHav/ihbench; the internal draft HlibHav/ihbench#1 is closed as superseded by boson-ai/ihbench#2.
 - Protocol: F2 settled (input_tokens includes cached tokens, probe `docs/evidence/probe-usage-20261024T165857Z.json`); F28 new (a cancelled response ends with one `response.done`, status `cancelled`). `scripts/smoke.py` now asserts the wire (usage present).
 - Glib's decisions 2026-10-24: composition root on the SDK allow-list (A1 closed); the websockets 12–13 redirect caveat is documented in the PR body; IHBench spec `Status: implemented`; branch merged into `main`.
 - Hand-off for Boson: `docs/BOSON-HANDOFF.md`. Demo runbook: `docs/DEMO-RUNBOOK.md`. Upstream PR body and command: `docs/ihbench-pr/` (not run).
 
-- Upstream PR opened by Glib, 2026-10-24: https://github.com/boson-ai/ihbench/pull/2 (from `HlibHav:feat/higgs-realtime-client`).
+- Upstream PR opened by Glib, 2026-10-24: https://github.com/boson-ai/ihbench/pull/2 (from `HlibHav:feat/higgs-realtime-client`); open, not a draft. Only Boson's maintainers can merge it.
+- Product README: draft PR https://github.com/HlibHav/higgs-agent-factory/pull/1 (`docs/readme-product`).
+- Worktrees `brief-agents-on-page`, `demo-recording-plan-a0eb9d`, `skills-coach-avatar`: branches merged, no uncommitted changes; `worktree_gc.sh` keeps them (live session / recently touched / no merged PR).
 
 ## In progress
 
