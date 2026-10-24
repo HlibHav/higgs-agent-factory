@@ -1,0 +1,101 @@
+{
+  "instructions_chars": 35360,
+  "response_1": {
+    "status": "completed",
+    "usage": {
+      "total_tokens": 10920,
+      "input_tokens": 10910,
+      "output_tokens": 10,
+      "input_token_details": {
+        "cached_tokens": 0
+      }
+    }
+  },
+  "response_2": {
+    "status": "completed",
+    "usage": {
+      "total_tokens": 10941,
+      "input_tokens": 10932,
+      "output_tokens": 9,
+      "input_token_details": {
+        "cached_tokens": 10912
+      }
+    }
+  },
+  "response_3_cancel_sent": true,
+  "response_3_done_arrived": true,
+  "response_3_status": "cancelled",
+  "response_3_usage": {
+    "total_tokens": 10971,
+    "input_tokens": 10968,
+    "output_tokens": 3,
+    "input_token_details": {
+      "cached_tokens": 0
+    }
+  },
+  "response_3_response_done_count": 1,
+  "response_3_event_types": [
+    "conversation.item.added",
+    "response.created",
+    "response.output_item.added",
+    "conversation.item.added",
+    "response.content_part.added",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.done",
+    "response.content_part.done",
+    "response.output_item.done",
+    "response.done"
+  ],
+  "all_event_types": [
+    "session.created",
+    "conversation.item.added",
+    "response.created",
+    "response.output_item.added",
+    "conversation.item.added",
+    "response.content_part.added",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.done",
+    "response.content_part.done",
+    "response.output_item.done",
+    "response.done",
+    "conversation.item.added",
+    "response.created",
+    "response.output_item.added",
+    "conversation.item.added",
+    "response.content_part.added",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.done",
+    "response.content_part.done",
+    "response.output_item.done",
+    "response.done",
+    "conversation.item.added",
+    "response.created",
+    "response.output_item.added",
+    "conversation.item.added",
+    "response.content_part.added",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.delta",
+    "response.output_text.done",
+    "response.content_part.done",
+    "response.output_item.done",
+    "response.done"
+  ]
+}
