@@ -1,0 +1,27 @@
+{
+  "name": "demo-film-graphics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Remotion compositions for the Higgs Agent Factory demo film: four graphic beats and a caption overlay.",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/*.test.ts\"",
+    "render": "node scripts/render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.528",
+    "@remotion/cli": "4.0.528",
+    "@remotion/renderer": "4.0.528",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.528",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
