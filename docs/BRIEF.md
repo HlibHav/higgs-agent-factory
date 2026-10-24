@@ -28,10 +28,12 @@ marked tentative.
 
 1. **20 s — the problem.** Anyone can spin up a voice agent in an afternoon. Nobody can tell you
    whether it is ready to talk to a customer.
-2. **60 s — brief → Agent Spec → Eval Card, live.** Pick the Specialist Training card, show the
-   generated Agent Spec, run the gate, show the Eval Card: scenario pass rate, IHBench RQ,
-   TTFA p50/p95, barge-in stop time, estimated audio cost, verdict.
+2. **60 s — brief → Agent Spec → Eval Card.** Pick the Specialist Training card, show the
+   generated Agent Spec, then the full Eval Card from a gate run made before the talk (its run id
+   and time on screen): scenario pass rate, IHBench RQ, TTFA p50/p95, barge-in stop time, cost,
+   verdict. Run one short scenario live so the room sees the gate is real.
 3. **60 s — talk to the agent.** A live conversation, with a deliberate interruption mid-sentence.
+   An agent that was not released can still talk, with a visible "not released" label.
 4. **40 s — what it means for Boson.** The IHBench client PR that lets Boson's own benchmark run
    against Boson's own API, and the friction log ([FRICTION.md](FRICTION.md)) handed over as a
    gift.
@@ -52,7 +54,8 @@ lower one.
 
 ## Success criteria
 
-- The IHBench PR is open against `boson-ai/ihbench`, small, and passes their checks.
+- The IHBench PR is open against `boson-ai/ihbench`, small, and reproducible from a clean
+  checkout with the smoke run its spec defines. Upstream has no CI or test suite to pass.
 - One Eval Card, from a real run, shown on stage. Every number on it is traceable.
 - The demo runs end to end live, or the recorded fallback plays without apology.
 - At least one Boson engineer asks about the gate, the PR or the friction log.
