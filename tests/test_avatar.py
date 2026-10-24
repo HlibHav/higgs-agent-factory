@@ -81,3 +81,47 @@ def test_delete_releases_a_pending_avatar(tmp_path: Path) -> None:
     client.post("/api/avatar/session")
     assert client.delete("/api/avatar/session").status_code == 200
     assert factory.created[0].closed == 1
+
+
+def test_create_waits_out_capacity_exhausted_then_succeeds(monkeypatch: Any) -> None:
+    import asyncio as _asyncio
+
+    import httpx
+
+    from factory.live import avatar_livekit as av
+
+    replies = [
+        httpx.Response(
+            429, headers={"retry-after": "5"}, json={"error": {"code": "capacity_exhausted"}}
+        ),
+        httpx.Response(201, json={"id": "avrt_1"}),
+    ]
+    slept: list[float] = []
+
+    async def fake_sleep(s: float) -> None:
+        slept.append(s)
+
+    monkeypatch.setattr(av.asyncio, "sleep", fake_sleep)
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: replies.pop(0)))
+    response = _asyncio.run(av._create(client, {}, {}))
+    assert response.status_code == 201 and slept == [5.0]
+
+
+def test_create_does_not_retry_quota_and_names_capacity(monkeypatch: Any) -> None:
+    import asyncio as _asyncio
+
+    import httpx
+
+    from factory.live import avatar_livekit as av
+
+    calls = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(429, json={"error": {"code": "insufficient_quota"}})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    response = _asyncio.run(av._create(client, {}, {}))
+    assert response.status_code == 429 and calls == [1]
+    busy = httpx.Response(429, json={"error": {"code": "capacity_exhausted"}})
+    assert "slot is busy" in av._refusal(busy)

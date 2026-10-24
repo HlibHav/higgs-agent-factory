@@ -140,10 +140,15 @@
 
   <section id="s2">
     <h2><span class="num">2</span> Gate: Eval Card + one live scenario</h2>
-    <div id="gateEmpty" class="muted">Pick a template first.</div>
+    <div id="gateEmpty" class="muted">Pick a template or a saved agent first.</div>
     <div id="gateBody" class="cols" hidden>
       <div class="gate">
         <h3>Stored Eval Card (latest full gate run)</h3>
+        <div class="row">
+          <button id="runGate" class="btn primary" type="button">Run full gate</button>
+          <button id="runCoach" class="btn" type="button" disabled>Coach failing skills</button>
+        </div>
+        <p id="jobStatus" class="running" aria-live="polite"></p>
         <div id="card"></div>
       </div>
       <div class="gate">
@@ -363,7 +368,67 @@
       el("div", { cls: "persona", text: res.body.persona || "" }),
       skillsEl(res.body.skills),
     );
+    if (res.body.proposal_id) {
+      const save = el("button", { cls: "btn primary", text: "Save as agent and use it", attrs: { type: "button" } });
+      const pid = res.body.proposal_id;
+      save.addEventListener("click", () => saveProposal(pid, save));
+      box.appendChild(el("div", { cls: "row" }, [save]));
+    }
     box.hidden = false;
+  }
+
+  // AC-81: the server stores its own proposal; the browser sends only the proposal id.
+  async function saveProposal(pid, btn) {
+    btn.disabled = true;
+    $("proposeStatus").textContent = "Saving…";
+    let res;
+    try { res = await getJson("/api/proposals/" + encodeURIComponent(pid) + "/save", { method: "POST" }); }
+    catch (e) { res = { ok: false, status: 0, body: { detail: e.message } }; }
+    if (!res.ok || !res.body || !res.body.agent_id) {
+      btn.disabled = false;
+      $("proposeStatus").textContent = "Could not save: " + detailOf(res);
+      return;
+    }
+    $("proposeStatus").textContent = "Saved as " + res.body.agent_id + ". It is selected above; run the gate in section 2.";
+    await loadTemplates();
+    for (const b of $("templates").children) {
+      const t = templates[Array.prototype.indexOf.call($("templates").children, b)];
+      if (t && t.template_id === res.body.agent_id) { selectTemplate(t, b); b.scrollIntoView({ block: "nearest" }); }
+    }
+  }
+
+  // ---------- 2: full gate and coach as background jobs (AC-82, AC-83) ----------
+  let jobTimer = null;
+  let jobWasRunning = false; // reload the card once, when a run we watched ends
+  async function startJob(kind) {
+    if (!selected) return;
+    const id = encodeURIComponent(selected.agentId);
+    const url = kind === "gate" ? "/api/agents/" + id + "/gate" : "/api/agents/" + id + "/coach/run";
+    let res;
+    try { res = await getJson(url, { method: "POST" }); } catch (e) { res = { ok: false, status: 0, body: { detail: e.message } }; }
+    if (!res.ok) { $("jobStatus").textContent = "Could not start: " + detailOf(res); return; }
+    pollJob();
+  }
+
+  async function pollJob() {
+    clearTimeout(jobTimer);
+    let res;
+    try { res = await getJson("/api/jobs/current"); } catch (e) { res = { ok: false }; }
+    const j = (res.ok && res.body) ? res.body : { state: "idle" };
+    const busy = j.state === "running";
+    $("runGate").disabled = busy || !selected;
+    if (busy) {
+      jobWasRunning = true;
+      const what = j.kind === "coach" ? "Coach and re-gate" : "Full gate";
+      $("jobStatus").textContent = what + " running for " + j.agent_id + "… (a few minutes; about a cent per gate run)";
+      $("runCoach").disabled = true;
+      jobTimer = setTimeout(pollJob, 2000);
+      return;
+    }
+    if (j.state === "done" || j.state === "failed") {
+      $("jobStatus").textContent = (j.state === "failed" ? "Failed: " : "") + (j.message || "");
+      if (jobWasRunning && selected && j.agent_id === selected.agentId) { jobWasRunning = false; loadGate(); }
+    }
   }
 
   // ---------- 2: gate ----------
@@ -400,6 +465,11 @@
     } else {
       renderCard(cardRes.body.card, cardRes.body.text);
     }
+    const verdict = (cardRes.ok && cardRes.body && cardRes.body.card) ? cardRes.body.card.verdict : null;
+    $("runCoach").disabled = verdict !== "rejected";
+    $("runGate").disabled = false;
+    pollJob(); // re-disables both while a run is in progress
+    $("runCoach").title = verdict === "rejected" ? "" : "The coach runs only on a rejected agent.";
     const s = $("scenarioSel");
     s.replaceChildren();
     scenarios = (scenRes.ok && Array.isArray(scenRes.body)) ? scenRes.body : [];
@@ -677,7 +747,11 @@ registerProcessor("pcm16-sender", Pcm16Sender);
     try {
       if (typeof LivekitClient === "undefined") throw new Error("livekit-client not loaded");
       const r = await fetch("/api/avatar/session", { method: "POST" });
-      if (!r.ok) throw new Error("avatar " + r.status);
+      if (!r.ok) {
+        let detail = "status " + r.status;
+        try { const b = await r.json(); if (b && typeof b.detail === "string") detail = b.detail; } catch (_) {}
+        throw new Error(detail);
+      }
       const a = await r.json();
       const room = new LivekitClient.Room();
       room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, _pub, participant) => {
@@ -695,7 +769,7 @@ registerProcessor("pcm16-sender", Pcm16Sender);
       return { room, name: a.room };
     } catch (e) {
       fetch("/api/avatar/session", { method: "DELETE" }).catch(() => {});
-      setLiveStatus("Avatar unavailable; continuing with audio only.", true);
+      setLiveStatus("Avatar unavailable (" + e.message + "); continuing with audio only.", true);
       return null;
     }
   }
@@ -925,11 +999,14 @@ registerProcessor("pcm16-sender", Pcm16Sender);
   }
 
   $("proposeBtn").addEventListener("click", propose);
+  $("runGate").addEventListener("click", () => startJob("gate"));
+  $("runCoach").addEventListener("click", () => startJob("coach"));
   $("runCheck").addEventListener("click", runCheck);
   $("startBtn").addEventListener("click", startLive);
   $("stopBtn").addEventListener("click", stopLive);
   window.addEventListener("pagehide", () => { if (live) stopLive(); });
   loadTemplates();
+  pollJob();
 })();
 </script>
 </body>

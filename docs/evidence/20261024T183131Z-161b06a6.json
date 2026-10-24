@@ -1,0 +1,726 @@
+{
+  "agent_id": "brief-onboarding-buddy-b948ed",
+  "run_id": "20261024T183131Z-161b06a6",
+  "ended_at": "2026-10-24T18:31:31.186342Z",
+  "verdict": "rejected",
+  "incomplete_cause": null,
+  "cause_detail": null,
+  "scenarios": [
+    {
+      "scenario_id": "handbook-location",
+      "title": "User asks where the handbook is",
+      "rubric": {
+        "pass_criteria": [
+          "The agent says the handbook is on the company wiki under 'People and Culture' in the 'Employee Handbook' section.",
+          "The reply is short, friendly and welcoming."
+        ],
+        "partial_criteria": [
+          "The agent says the handbook is on the company wiki but does not name the section or page."
+        ],
+        "fail_criteria": [
+          "The agent gives a different location or invents a link.",
+          "The agent does not say where the handbook is."
+        ]
+      },
+      "judgment": {
+        "label": "PASS",
+        "rationale": "The agent gives the exact location (company wiki, 'People and Culture', 'Employee Handbook' section) in a short, welcoming reply, with no invented link. The extra detail about what the handbook covers is minor and doesn't contradict the location.",
+        "evidence": "Welcome aboard! You can find the employee handbook on the company wiki, under the 'People and Culture' page in the 'Employee Handbook' section."
+      },
+      "transcript": "Welcome aboard! You can find the employee handbook on the company wiki, under the 'People and Culture' page in the 'Employee Handbook' section. It covers things like working hours, time off, expenses, and security rules.",
+      "tool_calls": [],
+      "expected_call_match": null,
+      "audio_source": "synthesised",
+      "judge_raw_reply": null,
+      "judge_raw_truncated": false,
+      "transcript_chars": null,
+      "skill_id": "handbook-lookup",
+      "skill_name": "Handbook lookup",
+      "judge_labels": [
+        "PASS",
+        "PASS"
+      ],
+      "judge_agreed": true
+    },
+    {
+      "scenario_id": "handbook-unknown-policy",
+      "title": "User asks about a policy not covered",
+      "rubric": {
+        "pass_criteria": [
+          "The agent does not claim a specific dog or pet policy.",
+          "The agent says it is not sure and suggests asking their manager, optionally pointing to the handbook."
+        ],
+        "partial_criteria": [
+          "The agent hedges but does not suggest asking the manager."
+        ],
+        "fail_criteria": [
+          "The agent states a definite pet policy as fact."
+        ]
+      },
+      "judgment": {
+        "label": "FAIL",
+        "rationale": "The agent never says it is unsure and does not suggest asking a manager. It also asserts, with no tool call to back it up, that the handbook has details about pets and gives a specific wiki location. That implies a policy exists and is documented, which counts as stating something definite as fact.",
+        "evidence": "You can find all the details about pets in the Employee Handbook, which is located on the company wiki under the 'People and Culture' page."
+      },
+      "transcript": "Great question! You can find all the details about pets in the Employee Handbook, which is located on the company wiki under the 'People and Culture' page.",
+      "tool_calls": [],
+      "expected_call_match": null,
+      "audio_source": "synthesised",
+      "judge_raw_reply": null,
+      "judge_raw_truncated": false,
+      "transcript_chars": null,
+      "skill_id": "handbook-lookup",
+      "skill_name": "Handbook lookup",
+      "judge_labels": [
+        "FAIL",
+        "FAIL"
+      ],
+      "judge_agreed": true
+    },
+    {
+      "scenario_id": "checklist-overview",
+      "title": "User asks for the first-week checklist",
+      "rubric": {
+        "pass_criteria": [
+          "The agent starts with the first checklist items such as laptop and accounts setup and security training.",
+          "The agent gives only one or two items at a time or a short summary and offers to continue."
+        ],
+        "partial_criteria": [
+          "The agent lists the items but in a confusing order or with a long answer."
+        ],
+        "fail_criteria": [
+          "The agent invents checklist items that are not in its procedure.",
+          "The agent gives a long monologue that lists everything with no offer to continue."
+        ]
+      },
+      "judgment": {
+        "label": "PARTIAL",
+        "rationale": "The agent starts with the right first items (laptop and accounts setup, then security training) and keeps the answer short. It never offers to continue with the remaining steps, so it falls short of a full pass, though it does not invent items or give a long monologue.",
+        "evidence": "First, set up your laptop and accounts. Then, complete the security training."
+      },
+      "transcript": "Absolutely! Your first-week checklist has five quick steps. First, set up your laptop and accounts. Then, complete the security training.",
+      "tool_calls": [],
+      "expected_call_match": null,
+      "audio_source": "synthesised",
+      "judge_raw_reply": null,
+      "judge_raw_truncated": false,
+      "transcript_chars": null,
+      "skill_id": "first-week-checklist",
+      "skill_name": "First-week checklist",
+      "judge_labels": [
+        "PARTIAL",
+        "PASS"
+      ],
+      "judge_agreed": false
+    },
+    {
+      "scenario_id": "checklist-interrupt",
+      "title": "User interrupts with a specific item",
+      "rubric": {
+        "pass_criteria": [
+          "The agent answers the question about the security training in the final turn.",
+          "The agent does not keep reading the rest of the checklist instead of answering."
+        ],
+        "partial_criteria": [
+          "The agent answers about the security training but also continues the checklist at length."
+        ],
+        "fail_criteria": [
+          "The agent ignores the new question and carries on with the checklist.",
+          "The agent invents details beyond what it knows about the training."
+        ]
+      },
+      "judgment": {
+        "label": "PASS",
+        "rationale": "The agent answers the security training question directly with a short description and does not go back to reading the rest of the checklist. The details about the module can't be checked against any source here, but nothing marks them as invented.",
+        "evidence": "It's a short online module covering our password rules, phishing awareness, and data protection. You'll find it in the 'Security' section of the handbook."
+      },
+      "transcript": "Great question! Your first-week checklist has five items.\nIt's a short online module covering our password rules, phishing awareness, and data protection. You'll find it in the 'Security' section of the handbook.",
+      "tool_calls": [],
+      "expected_call_match": null,
+      "audio_source": "synthesised",
+      "judge_raw_reply": null,
+      "judge_raw_truncated": false,
+      "transcript_chars": null,
+      "skill_id": "first-week-checklist",
+      "skill_name": "First-week checklist",
+      "judge_labels": [
+        "PASS",
+        "PASS"
+      ],
+      "judge_agreed": true
+    },
+    {
+      "scenario_id": "book-call-happy",
+      "title": "User books an intro call",
+      "rubric": {
+        "pass_criteria": [
+          "The agent asks for a preferred day and time before booking.",
+          "The agent confirms the 15-minute call on Tuesday at 10:00 out loud."
+        ],
+        "partial_criteria": [
+          "The agent confirms the booking but does not mention the length or the time."
+        ],
+        "fail_criteria": [
+          "The agent confirms a booking without the user giving a day and time.",
+          "The agent confirms a different day or time than the one requested."
+        ]
+      },
+      "judgment": {
+        "label": "PASS",
+        "rationale": "The agent asked for a preferred day and time before booking. After the user said Tuesday at 10:00, it booked that slot and confirmed the 15-minute call on Tuesday at 10:00 out loud. The greeting misnamed the user as \"Priyash\", but the rubric does not cover that, and the tool call used the correct name.",
+        "evidence": "What day and time works best for you? ... Your 15-minute intro call with your manager is booked for Tuesday at 10:00."
+      },
+      "transcript": "Hi Priyash! I can help you book that 15-minute intro call. What day and time works best for you?\nPerfect! Your 15-minute intro call with your manager is booked for Tuesday at 10:00.",
+      "tool_calls": [
+        {
+          "call_id": "chatcmpl-tool-bd2a5e17412941fc87284a7a4b92bbca",
+          "name": "book_intro_call",
+          "arguments": {
+            "employee_name": "Priya Shah",
+            "date": "Tuesday",
+            "time": "10:00"
+          },
+          "executor": "client",
+          "t": 822475.414630083
+        }
+      ],
+      "expected_call_match": "matched",
+      "audio_source": "synthesised",
+      "judge_raw_reply": null,
+      "judge_raw_truncated": false,
+      "transcript_chars": null,
+      "skill_id": "manager-intro-booking",
+      "skill_name": "Manager intro call booking",
+      "judge_labels": [
+        "PASS",
+        "PASS"
+      ],
+      "judge_agreed": true
+    },
+    {
+      "scenario_id": "book-call-slot-taken",
+      "title": "Requested slot is taken",
+      "rubric": {
+        "pass_criteria": [
+          "The agent tells the user that 09:00 is taken and offers 09:30.",
+          "After the user accepts, the agent confirms a 09:30 call."
+        ],
+        "partial_criteria": [
+          "The agent offers 09:30 but does not clearly confirm the final booking."
+        ],
+        "fail_criteria": [
+          "The agent says 09:00 is booked when it was not.",
+          "The agent does not offer the alternative slot."
+        ]
+      },
+      "judgment": {
+        "label": "FAIL",
+        "rationale": "The agent never said 09:00 was taken and never offered 09:30. It asked to confirm 9:00, then told the user the call was booked for \"Tuesday at 10:00\", which contradicts the user's request and the 09:30 Wednesday tool call.",
+        "evidence": "Great news, Sam! Your 15-minute intro call with your manager is booked for Tuesday at 10:00."
+      },
+      "transcript": "I can certainly help with that, Sam. Just to confirm, would you like me to book a 15-minute intro call with your manager for Wednesday at 9:00?\nGreat news, Sam! Your 15-minute intro call with your manager is booked for Tuesday at 10:00.",
+      "tool_calls": [
+        {
+          "call_id": "chatcmpl-tool-aa05e6392ad34c85b166eb90f270dddf",
+          "name": "book_intro_call",
+          "arguments": {
+            "employee_name": "Sam Lee",
+            "date": "Wednesday",
+            "time": "09:30"
+          },
+          "executor": "client",
+          "t": 822494.543081458
+        }
+      ],
+      "expected_call_match": "not matched",
+      "audio_source": "synthesised",
+      "judge_raw_reply": null,
+      "judge_raw_truncated": false,
+      "transcript_chars": null,
+      "skill_id": "manager-intro-booking",
+      "skill_name": "Manager intro call booking",
+      "judge_labels": [
+        "FAIL",
+        "FAIL"
+      ],
+      "judge_agreed": true
+    }
+  ],
+  "scenarios_run": 6,
+  "pass_rate": 0.5,
+  "failing_rubric_lines": [
+    {
+      "scenario_id": "handbook-unknown-policy",
+      "label": "FAIL",
+      "rubric": {
+        "pass_criteria": [
+          "The agent does not claim a specific dog or pet policy.",
+          "The agent says it is not sure and suggests asking their manager, optionally pointing to the handbook."
+        ],
+        "partial_criteria": [
+          "The agent hedges but does not suggest asking the manager."
+        ],
+        "fail_criteria": [
+          "The agent states a definite pet policy as fact."
+        ]
+      },
+      "rationale": "The agent never says it is unsure and does not suggest asking a manager. It also asserts, with no tool call to back it up, that the handbook has details about pets and gives a specific wiki location. That implies a policy exists and is documented, which counts as stating something definite as fact.",
+      "evidence": "You can find all the details about pets in the Employee Handbook, which is located on the company wiki under the 'People and Culture' page.",
+      "skill_id": "handbook-lookup",
+      "judge_agreed": true
+    },
+    {
+      "scenario_id": "checklist-overview",
+      "label": "PARTIAL",
+      "rubric": {
+        "pass_criteria": [
+          "The agent starts with the first checklist items such as laptop and accounts setup and security training.",
+          "The agent gives only one or two items at a time or a short summary and offers to continue."
+        ],
+        "partial_criteria": [
+          "The agent lists the items but in a confusing order or with a long answer."
+        ],
+        "fail_criteria": [
+          "The agent invents checklist items that are not in its procedure.",
+          "The agent gives a long monologue that lists everything with no offer to continue."
+        ]
+      },
+      "rationale": "The agent starts with the right first items (laptop and accounts setup, then security training) and keeps the answer short. It never offers to continue with the remaining steps, so it falls short of a full pass, though it does not invent items or give a long monologue.",
+      "evidence": "First, set up your laptop and accounts. Then, complete the security training.",
+      "skill_id": "first-week-checklist",
+      "judge_agreed": false
+    },
+    {
+      "scenario_id": "book-call-slot-taken",
+      "label": "FAIL",
+      "rubric": {
+        "pass_criteria": [
+          "The agent tells the user that 09:00 is taken and offers 09:30.",
+          "After the user accepts, the agent confirms a 09:30 call."
+        ],
+        "partial_criteria": [
+          "The agent offers 09:30 but does not clearly confirm the final booking."
+        ],
+        "fail_criteria": [
+          "The agent says 09:00 is booked when it was not.",
+          "The agent does not offer the alternative slot."
+        ]
+      },
+      "rationale": "The agent never said 09:00 was taken and never offered 09:30. It asked to confirm 9:00, then told the user the call was booked for \"Tuesday at 10:00\", which contradicts the user's request and the 09:30 Wednesday tool call.",
+      "evidence": "Great news, Sam! Your 15-minute intro call with your manager is booked for Tuesday at 10:00.",
+      "skill_id": "manager-intro-booking",
+      "judge_agreed": true
+    }
+  ],
+  "ihbench_rq": null,
+  "ttfa_p50_ms": 889.2765420023352,
+  "ttfa_p95_ms": 1100.6751669337973,
+  "ttfa_n": 7,
+  "ttfa_label": "timing starts at the last user speech chunk sent and includes the server VAD silence window (F8)",
+  "bargein_p50_ms": 99.7345409123227,
+  "bargein_tail_ms": 99.7345409123227,
+  "bargein_tail_kind": "max",
+  "input_audio_minutes": 0.8976666666666666,
+  "output_audio_minutes": 1.3031666666666666,
+  "estimated_audio_cost_usd": 0.020308966666666664,
+  "estimated_audio_cost_label": "estimated from Boson's published per-minute rates",
+  "estimated_audio_cost_per_minute_usd": null,
+  "token_usage_total": {
+    "input_tokens": 7920,
+    "cached_tokens": 6208,
+    "output_tokens": 372
+  },
+  "measured_token_cost_usd": null,
+  "measured_token_cost_label": null,
+  "token_cost_text": null,
+  "raw_turns": [
+    {
+      "scenario_id": "handbook-location",
+      "turn_index": 0,
+      "kind": "scripted",
+      "ttfa_ms": 396.4106250787154,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 1
+    },
+    {
+      "scenario_id": "handbook-unknown-policy",
+      "turn_index": 0,
+      "kind": "scripted",
+      "ttfa_ms": 891.904125106521,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 1
+    },
+    {
+      "scenario_id": "checklist-overview",
+      "turn_index": 0,
+      "kind": "scripted",
+      "ttfa_ms": 889.2765420023352,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 1
+    },
+    {
+      "scenario_id": "checklist-interrupt",
+      "turn_index": 0,
+      "kind": "scripted",
+      "ttfa_ms": 889.1942920163274,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 1
+    },
+    {
+      "scenario_id": "checklist-interrupt",
+      "turn_index": 1,
+      "kind": "scripted",
+      "ttfa_ms": 845.8533749217167,
+      "bargein_ms": 99.7345409123227,
+      "bargein_status": "measured",
+      "responses": 1
+    },
+    {
+      "scenario_id": "book-call-happy",
+      "turn_index": 0,
+      "kind": "scripted",
+      "ttfa_ms": 958.3460829453543,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 1
+    },
+    {
+      "scenario_id": "book-call-happy",
+      "turn_index": 1,
+      "kind": "scripted",
+      "ttfa_ms": null,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 2
+    },
+    {
+      "scenario_id": "book-call-slot-taken",
+      "turn_index": 0,
+      "kind": "scripted",
+      "ttfa_ms": 1100.6751669337973,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 1
+    },
+    {
+      "scenario_id": "book-call-slot-taken",
+      "turn_index": 1,
+      "kind": "scripted",
+      "ttfa_ms": null,
+      "bargein_ms": null,
+      "bargein_status": null,
+      "responses": 2
+    }
+  ],
+  "skills": [
+    {
+      "skill_id": "handbook-lookup",
+      "name": "Handbook lookup",
+      "scenarios_run": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "released": false
+    },
+    {
+      "skill_id": "first-week-checklist",
+      "name": "First-week checklist",
+      "scenarios_run": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "released": false
+    },
+    {
+      "skill_id": "manager-intro-booking",
+      "name": "Manager intro call booking",
+      "scenarios_run": 2,
+      "passed": 1,
+      "pass_rate": 0.5,
+      "released": false
+    }
+  ],
+  "judge_agreement_rate": 0.8333333333333334,
+  "agent_version": 2,
+  "parent_run_id": "20261024T182946Z-5a0cb488",
+  "coach_note": "coach rewrote: handbook-lookup",
+  "agent_spec": {
+    "id": "brief-onboarding-buddy-b948ed",
+    "schema_version": 2,
+    "version": 2,
+    "source": {
+      "kind": "brief",
+      "text": "An onboarding buddy for new employees at a small software company: answers where to find the handbook, explains the first-week checklist, and books a 15-minute intro call with their manager."
+    },
+    "role": "Onboarding buddy for new employees at a small software company",
+    "persona": "You are a friendly, upbeat onboarding buddy for new hires at a small software company. Speak warmly and plainly, in one to three short sentences per answer. If the user interrupts, stop at once and answer their new question. Never invent company policies or links; if you do not know something, say so and suggest asking their manager.",
+    "voice": "default",
+    "output_modality": "audio",
+    "temperature": null,
+    "max_output_tokens": null,
+    "skills": [
+      {
+        "id": "handbook-lookup",
+        "name": "Handbook lookup",
+        "purpose": "Tell new employees where to find the employee handbook and what it covers.",
+        "procedure": "When asked where the handbook is, reply in one or two short, warm sentences. Always give the full location: the company wiki, the page 'People and Culture', then the section called 'Employee Handbook'. Name both the page and the section. Optionally add that it covers working hours, time off, expenses, equipment and security rules. Never invent links. For policy details, point to the relevant handbook section instead of guessing. If something isn't in the handbook, say you're not sure and suggest asking their manager.",
+        "tools": [],
+        "scenarios": [
+          {
+            "id": "handbook-location",
+            "title": "User asks where the handbook is",
+            "user_voice": "chloe",
+            "user_turns": [
+              {
+                "text": "Hi, I just started today. Where can I find the employee handbook?",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              }
+            ],
+            "expected_tool_call": null,
+            "rubric": {
+              "pass_criteria": [
+                "The agent says the handbook is on the company wiki under 'People and Culture' in the 'Employee Handbook' section.",
+                "The reply is short, friendly and welcoming."
+              ],
+              "partial_criteria": [
+                "The agent says the handbook is on the company wiki but does not name the section or page."
+              ],
+              "fail_criteria": [
+                "The agent gives a different location or invents a link.",
+                "The agent does not say where the handbook is."
+              ]
+            }
+          },
+          {
+            "id": "handbook-unknown-policy",
+            "title": "User asks about a policy not covered",
+            "user_voice": "marcus",
+            "user_turns": [
+              {
+                "text": "Does the handbook say anything about bringing my dog to the office?",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              }
+            ],
+            "expected_tool_call": null,
+            "rubric": {
+              "pass_criteria": [
+                "The agent does not claim a specific dog or pet policy.",
+                "The agent says it is not sure and suggests asking their manager, optionally pointing to the handbook."
+              ],
+              "partial_criteria": [
+                "The agent hedges but does not suggest asking the manager."
+              ],
+              "fail_criteria": [
+                "The agent states a definite pet policy as fact."
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "first-week-checklist",
+        "name": "First-week checklist",
+        "purpose": "Explain the first-week checklist to new employees clearly and in order.",
+        "procedure": "The first-week checklist has five items: 1) set up your laptop and accounts, 2) complete the security training, 3) read the employee handbook, 4) meet your team in the Monday stand-up, 5) book an intro call with your manager. Explain items in order, one or two at a time, and offer to continue. If the user asks about one item, explain just that item. Keep answers short for voice.",
+        "tools": [],
+        "scenarios": [
+          {
+            "id": "checklist-overview",
+            "title": "User asks for the first-week checklist",
+            "user_voice": "eleanor",
+            "user_turns": [
+              {
+                "text": "Can you walk me through what I need to do this first week?",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              }
+            ],
+            "expected_tool_call": null,
+            "rubric": {
+              "pass_criteria": [
+                "The agent starts with the first checklist items such as laptop and accounts setup and security training.",
+                "The agent gives only one or two items at a time or a short summary and offers to continue."
+              ],
+              "partial_criteria": [
+                "The agent lists the items but in a confusing order or with a long answer."
+              ],
+              "fail_criteria": [
+                "The agent invents checklist items that are not in its procedure.",
+                "The agent gives a long monologue that lists everything with no offer to continue."
+              ]
+            }
+          },
+          {
+            "id": "checklist-interrupt",
+            "title": "User interrupts with a specific item",
+            "user_voice": "jake",
+            "user_turns": [
+              {
+                "text": "What is on the checklist for this week?",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              },
+              {
+                "text": "Wait, what is the security training exactly?",
+                "recording": null,
+                "interrupt_after_assistant_ms": 1500
+              }
+            ],
+            "expected_tool_call": null,
+            "rubric": {
+              "pass_criteria": [
+                "The agent answers the question about the security training in the final turn.",
+                "The agent does not keep reading the rest of the checklist instead of answering."
+              ],
+              "partial_criteria": [
+                "The agent answers about the security training but also continues the checklist at length."
+              ],
+              "fail_criteria": [
+                "The agent ignores the new question and carries on with the checklist.",
+                "The agent invents details beyond what it knows about the training."
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "manager-intro-booking",
+        "name": "Manager intro call booking",
+        "purpose": "Book a 15-minute intro call between the new employee and their manager.",
+        "procedure": "Ask for the employee's name and a preferred day and time before booking. Calls are always 15 minutes. Use the book_intro_call tool with the employee name, the preferred date and the preferred time, then confirm the booked slot out loud. If the tool says the slot is taken, offer the alternative it returns. Do not book without a name and a preferred time.",
+        "tools": [
+          {
+            "kind": "client",
+            "name": "book_intro_call",
+            "description": "Book a 15-minute intro call between a new employee and their manager.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "employee_name": {
+                  "type": "string",
+                  "description": "Full name of the new employee"
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Preferred date, for example Tuesday"
+                },
+                "time": {
+                  "type": "string",
+                  "description": "Preferred start time, for example 10:00"
+                }
+              },
+              "required": [
+                "employee_name",
+                "date",
+                "time"
+              ]
+            },
+            "mock": {
+              "default_output": "Booked: 15-minute intro call with your manager on Tuesday at 10:00.",
+              "by_argument": [
+                {
+                  "when": {
+                    "time": "09:00"
+                  },
+                  "output": "That slot is taken. The next free slot is 09:30 on the same day."
+                }
+              ]
+            }
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "book-call-happy",
+            "title": "User books an intro call",
+            "user_voice": "nora",
+            "user_turns": [
+              {
+                "text": "I'd like to book my intro call with my manager. I'm Priya Shah.",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              },
+              {
+                "text": "Tuesday at 10:00 would be great.",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              }
+            ],
+            "expected_tool_call": {
+              "name": "book_intro_call",
+              "arguments": {
+                "employee_name": "Priya Shah",
+                "date": "Tuesday",
+                "time": "10:00"
+              }
+            },
+            "rubric": {
+              "pass_criteria": [
+                "The agent asks for a preferred day and time before booking.",
+                "The agent confirms the 15-minute call on Tuesday at 10:00 out loud."
+              ],
+              "partial_criteria": [
+                "The agent confirms the booking but does not mention the length or the time."
+              ],
+              "fail_criteria": [
+                "The agent confirms a booking without the user giving a day and time.",
+                "The agent confirms a different day or time than the one requested."
+              ]
+            }
+          },
+          {
+            "id": "book-call-slot-taken",
+            "title": "Requested slot is taken",
+            "user_voice": "oliver",
+            "user_turns": [
+              {
+                "text": "Hi, I'm Sam Lee. Can you book my intro call with my manager for Wednesday at 09:00?",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              },
+              {
+                "text": "Yes, 09:30 works for me.",
+                "recording": null,
+                "interrupt_after_assistant_ms": null
+              }
+            ],
+            "expected_tool_call": {
+              "name": "book_intro_call",
+              "arguments": {
+                "employee_name": "Sam Lee",
+                "time": "09:00"
+              }
+            },
+            "rubric": {
+              "pass_criteria": [
+                "The agent tells the user that 09:00 is taken and offers 09:30.",
+                "After the user accepts, the agent confirms a 09:30 call."
+              ],
+              "partial_criteria": [
+                "The agent offers 09:30 but does not clearly confirm the final booking."
+              ],
+              "fail_criteria": [
+                "The agent says 09:00 is booked when it was not.",
+                "The agent does not offer the alternative slot."
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "turn_detection": {
+      "threshold": 0.5,
+      "prefix_padding_ms": 300,
+      "silence_duration_ms": 500
+    },
+    "budget": {
+      "max_scenarios": 6,
+      "max_audio_s_per_run": 240.0,
+      "max_judge_calls_per_scenario": 2,
+      "max_live_session_s": 180.0
+    }
+  }
+}

@@ -13,6 +13,12 @@ Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude 
 - Research: `docs/research/2026-10-24-generator-evals.md` (generator evaluation not implemented).
 - Page checked in the built-in browser on port 8012: skills, v2 card with per-skill table, judge agreement, coach diff, avatar checkbox; no console errors.
 
+## New on `feat/brief-agents-on-page` (2026-10-24 ~18:36Z, not merged)
+
+- Brief agents on the page (AC-81…AC-84). **Propose skills** → **Save as agent and use it** (the server keeps the proposal and refuses server tools) → the "From brief: …" card → **Run full gate** / **Coach failing skills** as background jobs → live talk. Checked in the browser on :8012 with `brief-onboarding-buddy-b948ed`: v1 rejected 5/6 → coach 2 rounds → v3 rejected 5/6 (`docs/CLAIMS.md`).
+- Fix: after a mocked tool output the client now sends `response.create` (F29), and the runner waits at most 10 s for the follow-up. Before this, any tool scenario hung the gate. No tool-using template had been live-gated before.
+- Avatar: Boson's shared slot pool refused every create from 18:17Z to 18:29Z (`429 capacity_exhausted`, F30). The start now waits up to 20 s for a slot, and the page shows the reason. Not our bug; we cannot see who holds the slots.
+
 ## Works now
 
 - P1 live gate, Specialist Training: `uv run python -m factory gate --template specialist-training` → run `20261024T171443Z-35b3f15b` (current code, 17:14Z), `rejected`, 5/6 PASS (st-6 PARTIAL); TTFA p50 748 ms / p95 1,100 ms (n = 7); barge-in 117 ms (n = 1, response ended `cancelled`); estimated audio $0.0118. Card: `docs/evidence/eval-card-20261024T171443Z-35b3f15b.{json,txt}`. Earlier card `20261024T164057Z-9e2ee667` kept in `docs/evidence/`.

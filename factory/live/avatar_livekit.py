@@ -7,6 +7,7 @@ Assistant PCM goes to the avatar over a LiveKit data stream (`DataStreamAudioOut
 `VIEWER_TTL_S`; the LiveKit secret and the Boson key never leave this module.
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import timedelta
@@ -27,6 +28,7 @@ SAMPLE_RATE = 24000  # F11: 24 kHz 16-bit mono PCM
 OUTPUT_SIZE = {"width": 480, "height": 640}
 VIEWER_TTL_S = 600  # at most 10 minutes
 HTTP_TIMEOUT_S = 30.0
+CREATE_PATIENCE_S = 20.0  # how long to wait for a free avatar slot (429 capacity_exhausted)
 
 
 class LiveKitConfig:
@@ -155,7 +157,7 @@ async def start_avatar(
                 "audio_source": "data_stream",
             },
         }
-        response = await http.post(AVATAR_SESSIONS_URL, json=body, headers=headers)
+        response = await _create(http, body, headers)
         if response.status_code != 201:
             raise AvatarError(_refusal(response))
         session_id = str(response.json()["id"])
@@ -175,6 +177,37 @@ async def start_avatar(
         raise AvatarError(f"The avatar could not start ({type(exc).__name__}).") from None
 
 
+def _retryable(response: httpx.Response) -> bool:
+    """F11: only a full-capacity 429 or a transient 503 is worth another try. A 429 for
+    quota or rate limits is final; nothing was created, so a retry cannot duplicate a session."""
+    if response.status_code not in (429, 503):
+        return False
+    try:
+        err = response.json().get("error")
+        code = err.get("code", "") if isinstance(err, dict) else ""
+    except ValueError:
+        return False
+    return code in {"capacity_exhausted", "service_unavailable"}
+
+
+async def _create(
+    http: httpx.AsyncClient, body: dict[str, object], headers: dict[str, str]
+) -> httpx.Response:
+    """POST the session, waiting out "every slot is in use" for up to ~CREATE_PATIENCE_S."""
+    waited = 0.0
+    while True:
+        response = await http.post(AVATAR_SESSIONS_URL, json=body, headers=headers)
+        if not _retryable(response) or waited >= CREATE_PATIENCE_S:
+            return response
+        try:
+            delay = float(response.headers.get("retry-after", "3"))
+        except ValueError:
+            delay = 3.0
+        delay = min(max(delay, 1.0), 5.0)
+        await asyncio.sleep(delay)
+        waited += delay
+
+
 def _refusal(response: httpx.Response) -> str:
     code = ""
     try:
@@ -183,6 +216,8 @@ def _refusal(response: httpx.Response) -> str:
     except ValueError:
         pass
     suffix = f", {code[:60]}" if code else ""
+    if code == "capacity_exhausted":
+        return "Every Boson avatar slot is busy right now; try again in a minute."
     return f"The avatar was refused (status {response.status_code}{suffix})."  # F11 (429 capacity)
 
 

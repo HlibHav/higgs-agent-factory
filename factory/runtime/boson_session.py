@@ -16,6 +16,7 @@ import asyncio
 import base64
 import binascii
 import json
+import uuid
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -158,10 +159,25 @@ class BosonRealtimeSession:
 
     async def send_tool_output(self, call_id: str, output: str) -> None:
         service = self._require_service()
-        await service.send_client_event(  # F3: exactly one item, no response.create
+        await service.send_client_event(  # F3: exactly one item
             {
                 "type": "conversation.item.create",
                 "item": {"type": "function_call_output", "call_id": call_id, "output": output},
+            }
+        )
+        # The server does not continue on its own after a tool output: a live gate run hung
+        # here on 2026-10-24. pipecat-boson's own context path follows the output with
+        # response.create (vendor-ref test_completed_function_call_output_creates_follow_up_
+        # response). We send the same tagged event as its `_create_response`, without the
+        # pipecat context setup this session does not use; the tag keeps the reply from being
+        # dropped as a stale response.
+        event_id = str(uuid.uuid4())
+        service._boson_pending_response_client_event_ids.add(event_id)
+        await service.send_client_event(
+            {
+                "event_id": event_id,
+                "type": "response.create",
+                "response": {"metadata": {"client_event_id": event_id}},
             }
         )
 
