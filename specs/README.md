@@ -20,4 +20,4 @@ Normative specs: what a feature must do and why, never how to build it (that is 
 ## Contents
 
 - [2026-10-24-higgs-agent-factory.md](2026-10-24-higgs-agent-factory.md) — SPEC-2026-10-24-higgs-agent-factory: Agent Spec, generator, eval gate and Eval Card for voice agents on Higgs Realtime (P1, P2). Status: draft.
-- [2026-10-24-ihbench-higgs-client.md](2026-10-24-ihbench-higgs-client.md) — SPEC-2026-10-24-ihbench-higgs-client: IHBench client for Higgs Realtime, contributed as a PR to `boson-ai/ihbench` (P0). Status: draft.
+- [2026-10-24-ihbench-higgs-client.md](2026-10-24-ihbench-higgs-client.md) — SPEC-2026-10-24-ihbench-higgs-client: IHBench client for Higgs Realtime, contributed as a PR to `boson-ai/ihbench` (P0). Status: approved.

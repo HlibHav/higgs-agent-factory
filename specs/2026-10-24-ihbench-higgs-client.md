@@ -1,6 +1,6 @@
 # Spec: IHBench client for Higgs Realtime
 Spec ID: SPEC-2026-10-24-ihbench-higgs-client
-Status: draft
+Status: approved
 Tier: Full SDD — scorecard 4/6 (raised by spec-creator from the main session's 3/6, Lightweight: Q2 became "yes" because a sample's multi-turn history can be replayed two ways)
 Supersedes: none
 Packages: the fork `../ihbench-higgs` of `boson-ai/ihbench`, branch `feat/higgs-realtime-client`, PR to `boson-ai/ihbench`. The spec lives in this repo. The code lives in the fork.
@@ -269,3 +269,4 @@ The red-first unit tests run against a fake WebSocket server and live on a separ
 | date | change | why |
 |---|---|---|
 | 2026-10-24 | Spec created as draft, Full SDD 4/6 (create plus answers mode). | P0 of `docs/BRIEF.md`. Glib answered Q1–Q6 and the runner-edit question, and research added F14, F16, F20 and F21. After the live smoke the F2 wording was aligned (docs and wire disagree on usage). F1, F5 and F14 are now VERIFIED-RUN; ids unchanged. |
+| 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word because the editor change was not saved to disk. |
