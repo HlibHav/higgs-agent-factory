@@ -49,3 +49,10 @@ class FileCardStore:
             if newest is None or (card.ended_at, card.run_id) > (newest.ended_at, newest.run_id):
                 newest = card
         return newest
+
+    def by_run_id(self, agent_id: str, run_id: str) -> EvalCard | None:
+        path = self._root / _check_id(agent_id) / f"{_check_id(run_id)}.json"
+        try:
+            return EvalCard.model_validate_json(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None

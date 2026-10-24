@@ -108,6 +108,13 @@
   .ttfa-label { color: var(--muted); }
   .transcript { max-height: 160px; overflow: auto; background: var(--bg); border-radius: 6px; padding: 8px; font-size: .92rem; }
   .transcript p { margin: 0 0 6px; }
+  .skill { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; background: var(--bg); }
+  .skill h4 { margin: 0 0 4px; font-size: 1.02rem; }
+  .skill .proc { white-space: pre-wrap; font-size: .9rem; }
+  .changed { background: #fff6d6; font-weight: 700; }
+  .disagree { color: var(--partial); font-weight: 700; }
+  .brief textarea { width: 100%; min-height: 4.5em; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  #proposed { margin-top: 10px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -121,6 +128,14 @@
     <h2><span class="num">1</span> Pick a template</h2>
     <div id="templates" class="cards" aria-live="polite"><span class="muted">Loading templates&hellip;</span></div>
     <div id="spec" class="spec" hidden></div>
+    <div class="spec brief">
+      <h3>Or describe an agent</h3>
+      <label for="briefText" class="muted">Describe an agent (up to 1,000 characters)</label>
+      <textarea id="briefText" maxlength="1000"></textarea>
+      <div class="row"><button id="proposeBtn" class="btn" type="button">Propose skills</button>
+      <span id="proposeStatus" class="running" aria-live="polite"></span></div>
+      <div id="proposed" hidden></div>
+    </div>
   </section>
 
   <section id="s2">
@@ -141,6 +156,10 @@
         <p id="checkStatus" class="running" aria-live="polite"></p>
         <div id="checkResult" class="check" hidden></div>
       </div>
+    </div>
+    <div id="coachBox" class="gate" hidden>
+      <h3>Coach: before &rarr; after</h3>
+      <div id="coach"></div>
     </div>
   </section>
 
@@ -276,12 +295,28 @@
     loadGate();
   }
 
+  function skillsEl(skills) {
+    const box = el("div");
+    for (const k of (skills || [])) {
+      const tools = (k.tools || []).map((x) => x.name).filter(Boolean).join(", ") || "none";
+      const scen = el("ul", { cls: "plain" });
+      for (const sc of (k.scenarios || [])) scen.appendChild(el("li", { text: sc.id + ": " + sc.title }));
+      box.appendChild(el("div", { cls: "skill" }, [
+        el("h4", { text: k.name + " (" + k.id + ")" }),
+        el("div", { text: k.purpose }),
+        el("div", { cls: "proc", text: k.procedure }),
+        el("div", { cls: "muted", text: "Tools: " + tools }),
+        el("div", { cls: "muted", text: "Scenarios:" }),
+        scen,
+      ]));
+    }
+    if (!box.children.length) box.appendChild(el("span", { cls: "muted", text: "No skills." }));
+    return box;
+  }
+
   function renderSpec(t, spec) {
     const b = spec.budget || {};
-    const scenList = el("ul", { cls: "plain" });
-    for (const s of (spec.scenarios || [])) scenList.appendChild(el("li", { text: s.title + " (" + s.id + ")" }));
-    const tools = (spec.tools || []).map((x) => x.name).join(", ") || "none";
-    const persona = el("div", { cls: "persona", text: (spec.role ? spec.role + "\n\n" : "") + (spec.instructions || "") });
+    const persona = el("div", { cls: "persona", text: (spec.role ? spec.role + "\n\n" : "") + (spec.persona || "") });
     const budget = el("ul", { cls: "plain" }, [
       el("li", { text: "max scenarios: " + b.max_scenarios }),
       el("li", { text: "max audio per run: " + b.max_audio_s_per_run + " s" }),
@@ -289,19 +324,43 @@
       el("li", { text: "max live session: " + b.max_live_session_s + " s" }),
     ]);
     const raw = el("details", null, [el("summary", { text: "Raw Agent Spec JSON" }), el("pre", { text: JSON.stringify(spec, null, 2) })]);
-    $("spec").replaceChildren(
-      el("h3", { text: "Agent Spec: " + t.name }),
-      kv([
-        ["Name", t.name],
-        ["Agent id", spec.id],
-        ["Persona", persona],
-        ["Voice", spec.voice],
-        ["Tools", tools],
-        ["Scenarios", scenList],
-        ["Budget", budget],
-      ]),
-      raw,
+    const pairs = [
+      ["Name", t.name],
+      ["Agent id", spec.id],
+    ];
+    if (typeof spec.version === "number" && spec.version > 1) pairs.push(["Agent version", "v" + spec.version]);
+    pairs.push(["Persona", persona], ["Voice", spec.voice], ["Skills", skillsEl(spec.skills)], ["Budget", budget]);
+    $("spec").replaceChildren(el("h3", { text: "Agent Spec: " + t.name }), kv(pairs), raw);
+  }
+
+  async function propose() {
+    const text = $("briefText").value;
+    const box = $("proposed");
+    if (!text.trim()) { $("proposeStatus").textContent = "Write a short description first."; return; }
+    $("proposeBtn").disabled = true;
+    $("proposeStatus").textContent = "Proposing skills…";
+    let res;
+    try {
+      res = await getJson("/api/brief", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief: text }) });
+    } catch (e) { res = { ok: false, status: 0, body: { detail: e.message } }; }
+    $("proposeBtn").disabled = false;
+    if (res.status === 422 && res.body && Array.isArray(res.body.issues)) {
+      $("proposeStatus").textContent = "The proposal had problems:";
+      const ul = el("ul", { cls: "plain" });
+      for (const i of res.body.issues) ul.appendChild(el("li", { text: i.field + ": " + i.message }));
+      box.replaceChildren(ul);
+      box.hidden = false;
+      return;
+    }
+    if (!res.ok || !res.body) { $("proposeStatus").textContent = "Could not propose skills: " + detailOf(res); box.hidden = true; return; }
+    $("proposeStatus").textContent = "";
+    box.replaceChildren(
+      el("span", { cls: "marker", text: "proposed, not gated" }),
+      el("h3", { text: "Proposed: " + (res.body.role || "") }),
+      el("div", { cls: "persona", text: res.body.persona || "" }),
+      skillsEl(res.body.skills),
     );
+    box.hidden = false;
   }
 
   // ---------- 2: gate ----------
@@ -313,6 +372,8 @@
     $("checkStatus").textContent = "";
     $("checkResult").hidden = true;
     $("checkResult").replaceChildren();
+    $("coachBox").hidden = true;
+    $("coach").replaceChildren();
   }
 
   async function loadGate() {
@@ -322,11 +383,13 @@
     $("gateBody").hidden = false;
     $("card").replaceChildren(el("span", { cls: "muted", text: "Loading stored Eval Card…" }));
     const id = encodeURIComponent(sel.agentId);
-    const [cardRes, scenRes] = await Promise.all([
+    const [cardRes, scenRes, coachRes] = await Promise.all([
       getJson("/api/agents/" + id + "/card/latest").catch((e) => ({ ok: false, status: 0, body: { detail: e.message } })),
       getJson("/api/agents/" + id + "/scenarios").catch((e) => ({ ok: false, status: 0, body: { detail: e.message } })),
+      getJson("/api/agents/" + id + "/coach").catch((e) => ({ ok: false, status: 0, body: null })),
     ]);
     if (selected !== sel) return;
+    if (coachRes.ok && coachRes.body && coachRes.body.diff) renderCoach(coachRes.body);
     if (cardRes.status === 404) {
       $("card").replaceChildren(el("p", { cls: "status", text: "No gate run yet." }));
     } else if (!cardRes.ok || !cardRes.body || !cardRes.body.card) {
@@ -349,6 +412,10 @@
       ["Run id", card.run_id],
       ["Timestamp", ts],
       ["Incomplete cause", card.incomplete_cause ? card.incomplete_cause + (card.cause_detail ? " (" + card.cause_detail + ")" : "") : "none"],
+      ["Judge agreement", typeof card.judge_agreement_rate === "number" ? "Judge agreement: " + Math.round(card.judge_agreement_rate * 100) + "%" : "n/a"],
+      ["Agent version", card.agent_version],
+      ["Parent run", card.parent_run_id || "none"],
+      ["Coach note", card.coach_note || "none"],
       ["Pass rate", typeof card.pass_rate === "number" ? Math.round(card.pass_rate * 100) + "% of " + card.scenarios_run + " scenarios" : "n/a"],
       ["TTFA p50 / p95", fmtMs(card.ttfa_p50_ms) + " / " + fmtMs(card.ttfa_p95_ms) + " (n=" + (card.ttfa_n || 0) + ")" + (card.ttfa_label ? " — " + card.ttfa_label : "")],
       ["Barge-in p50 / tail", fmtMs(card.bargein_p50_ms) + " / " + fmtMs(card.bargein_tail_ms) + (card.bargein_tail_kind ? " (" + card.bargein_tail_kind + ")" : "")],
@@ -356,19 +423,65 @@
       ["Audio in / out", fmtNum(card.input_audio_minutes, 2) + " / " + fmtNum(card.output_audio_minutes, 2) + " min"],
       ["Est. audio cost", typeof card.estimated_audio_cost_usd === "number" ? "$" + card.estimated_audio_cost_usd.toFixed(4) + (card.estimated_audio_cost_label ? " (" + card.estimated_audio_cost_label + ")" : "") : "n/a"],
     ]);
-    const table = el("table", null, [el("thead", null, [el("tr", null, [el("th", { text: "Scenario" }), el("th", { text: "Label" })])])]);
+    const table = el("table", null, [el("thead", null, [el("tr", null, [el("th", { text: "Scenario" }), el("th", { text: "Skill" }), el("th", { text: "Label" })])])]);
     const tbody = el("tbody");
     for (const s of (card.scenarios || [])) {
       const tdL = el("td");
       tdL.appendChild(labelEl(s.judgment ? s.judgment.label : null));
-      tbody.appendChild(el("tr", null, [el("td", { text: s.title || s.scenario_id }), tdL]));
+      if (s.judge_agreed === false) {
+        tdL.appendChild(el("div", { cls: "disagree", text: "judge disagreed (" + (Array.isArray(s.judge_labels) ? s.judge_labels.join(", ") : "n/a") + ")" }));
+      }
+      tbody.appendChild(el("tr", null, [el("td", { text: s.title || s.scenario_id }), el("td", { text: s.skill_name || s.skill_id || "" }), tdL]));
     }
     table.appendChild(tbody);
-    const nodes = [head, el("h3", { text: "Scenarios", attrs: { style: "margin-top:12px" } }), table];
+    const skTable = el("table", null, [el("thead", null, [el("tr", null, [el("th", { text: "Skill" }), el("th", { text: "PASS / run" }), el("th", { text: "Result" })])])]);
+    const skBody = el("tbody");
+    for (const k of (card.skills || [])) {
+      const ok = k.released === true;
+      skBody.appendChild(el("tr", null, [
+        el("td", { text: k.name || k.skill_id }),
+        el("td", { text: k.passed + " / " + k.scenarios_run }),
+        el("td", { cls: ok ? "l-PASS" : "l-FAIL", text: ok ? "passed" : "not passed" }),
+      ]));
+    }
+    skTable.appendChild(skBody);
+    const nodes = [head, el("h3", { text: "Skills", attrs: { style: "margin-top:12px" } }), skTable, el("h3", { text: "Scenarios", attrs: { style: "margin-top:12px" } }), table];
     if (typeof text === "string" && text) {
       nodes.push(el("details", { attrs: { open: "" } }, [el("summary", { text: "Eval Card (text)" }), el("pre", { text })]));
     }
     $("card").replaceChildren(...nodes);
+  }
+
+  function renderCoach(data) {
+    const d = data.diff;
+    const word = (v) => (v === null || v === undefined) ? "none" : String(v);
+    const rows = el("tbody");
+    const addRows = (group, list) => {
+      for (const c of (list || [])) {
+        const changed = word(c.before) !== word(c.after);
+        const tr = el("tr", { cls: changed ? "changed" : "" }, [
+          el("td", { text: group }), el("td", { text: c.key }),
+          el("td", { text: word(c.before) }), el("td", { text: word(c.after) }),
+          el("td", { text: changed ? "changed" : "same" }),
+        ]);
+        rows.appendChild(tr);
+      }
+    };
+    addRows("verdict", [d.verdict]);
+    addRows("skill", d.skills);
+    addRows("scenario", d.scenarios);
+    addRows("metric", d.metrics);
+    const table = el("table", null, [el("thead", null, [el("tr", null, [
+      el("th", { text: "Part" }), el("th", { text: "Item" }), el("th", { text: "Before" }), el("th", { text: "After" }), el("th", { text: "Change" })])]), rows]);
+    const nodes = [
+      el("p", { text: "Verdict: " + word(d.verdict.before).toUpperCase() + " \u2192 " + word(d.verdict.after).toUpperCase() +
+        " (run " + d.before_run_id + " \u2192 " + d.after_run_id + ")" }),
+      table,
+    ];
+    const note = data.after && data.after.coach_note;
+    if (note) nodes.push(el("p", { text: "Coach note: " + note }));
+    $("coach").replaceChildren(...nodes);
+    $("coachBox").hidden = false;
   }
 
   async function runCheck() {
@@ -758,6 +871,7 @@ registerProcessor("pcm16-sender", Pcm16Sender);
     for (const b of $("templates").children) if (b.tagName === "BUTTON") b.disabled = locked;
   }
 
+  $("proposeBtn").addEventListener("click", propose);
   $("runCheck").addEventListener("click", runCheck);
   $("startBtn").addEventListener("click", startLive);
   $("stopBtn").addEventListener("click", stopLive);

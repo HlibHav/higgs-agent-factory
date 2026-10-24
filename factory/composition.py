@@ -24,6 +24,9 @@ from factory.agent_spec.brief_anthropic import AnthropicBriefModel
 from factory.agent_spec.generator import BriefTooLong, generate_from_brief
 from factory.agent_spec.models import AgentSpec, SpecIssue
 from factory.agent_spec.templates import TEMPLATE_IDS, TemplateNotAvailable, load_template
+from factory.agent_spec.validation import validate_agent_spec
+from factory.coach.coach import coach_spec
+from factory.coach.coach_anthropic import AnthropicCoachModel
 from factory.gate.card_builder import build_card
 from factory.gate.card_store import FileCardStore
 from factory.gate.judge_anthropic import AnthropicJudge
@@ -35,6 +38,7 @@ from factory.live.session import LiveAudioDelta
 from factory.ports import (
     AudioDelta,
     BriefModel,
+    CoachModel,
     JudgePort,
     RealtimeSession,
     SessionEvent,
@@ -111,18 +115,84 @@ class FactoryApp:
     judge: JudgePort
     store: FileCardStore
     brief_model: BriefModel | None = None
+    coach_model: CoachModel | None = None
     last_path: Path | None = None
     live_sessions: SessionFactory | None = None  # live pages need PCM in the audio deltas
     _closers: tuple[Callable[[], Awaitable[None]], ...] = ()
 
-    async def run_gate_for_template(self, template_id: str) -> EvalCard | GateAborted:
+    async def run_gate_for_template(
+        self, template_id: str, caller_voice: str | None = None
+    ) -> EvalCard | GateAborted:
         try:
             spec = load_template(template_id)
         except TemplateNotAvailable as exc:
             return GateAborted(f"Template unavailable: {exc}.")
-        return await self._gate(spec)
+        return await self._gate(spec, caller_voice=caller_voice)
 
-    async def run_gate_for_brief(self, brief: str) -> EvalCard | GateAborted | list[SpecIssue]:
+    async def coach_template(
+        self,
+        template_id: str,
+        rounds: int = 2,
+        from_latest: bool = True,
+        caller_voice: str | None = None,
+    ) -> list[EvalCard] | GateAborted:
+        """AC-76, AC-77: gate, then coach and re-gate while rejected. Each card's verdict is
+        its own gate's verdict; the coach never sets it."""
+        try:
+            template = load_template(template_id)
+        except TemplateNotAvailable as exc:
+            return GateAborted(f"Template unavailable: {exc}.")
+        if self.coach_model is None:
+            return GateAborted("No coach model is configured.")
+        first: EvalCard | GateAborted | None = None
+        if from_latest:
+            stored = self.latest_card(template.id)
+            if stored is not None and stored.verdict == "rejected" and stored.agent_spec:
+                first = stored
+        if first is None:
+            first = await self._gate(template, caller_voice=caller_voice)
+        if isinstance(first, GateAborted):
+            return first
+        cards = [first]
+        for _ in range(max(rounds, 0)):
+            latest = cards[-1]
+            if latest.verdict != "rejected" or not latest.agent_spec:
+                break
+            current = validate_agent_spec(latest.agent_spec)
+            if not isinstance(current, AgentSpec):
+                break
+            try:
+                coached = await coach_spec(current, latest, self.coach_model)
+            except anthropic.APIError as exc:
+                return GateAborted(f"The coach call failed ({_api_error(exc)}).")
+            if coached is None:
+                break
+            new_spec, changed = coached
+            result = await self._gate(
+                new_spec,
+                caller_voice=caller_voice,
+                parent_run_id=latest.run_id,
+                coach_note=f"coach rewrote: {', '.join(changed)}",
+            )
+            if isinstance(result, GateAborted):
+                return result
+            cards.append(result)
+        return cards
+
+    def coach_pair(self, agent_id: str) -> tuple[EvalCard, EvalCard] | None:
+        """The latest card that has a parent, and that parent."""
+        latest = self.latest_card(agent_id)
+        if latest is None or latest.parent_run_id is None:
+            return None
+        try:
+            parent = self.store.by_run_id(agent_id, latest.parent_run_id)
+        except ValueError:
+            return None
+        return None if parent is None else (parent, latest)
+
+    async def run_gate_for_brief(
+        self, brief: str, caller_voice: str | None = None
+    ) -> EvalCard | GateAborted | list[SpecIssue]:
         if self.brief_model is None:
             return GateAborted("No brief model is configured.")
         try:
@@ -133,13 +203,23 @@ class FactoryApp:
             return GateAborted(f"The brief model call failed ({_api_error(exc)}).")
         if isinstance(generated, list):
             return generated
-        return await self._gate(generated)
+        return await self._gate(generated, caller_voice=caller_voice)
 
-    async def _gate(self, spec: AgentSpec) -> EvalCard | GateAborted:
+    async def _gate(
+        self,
+        spec: AgentSpec,
+        caller_voice: str | None = None,
+        parent_run_id: str | None = None,
+        coach_note: str | None = None,
+    ) -> EvalCard | GateAborted:
         try:
             checked = preflight(spec.model_dump(mode="json"))
             record = await run_gate(
-                checked, sessions=self.sessions, audio=self.audio, judge=self.judge
+                checked,
+                sessions=self.sessions,
+                audio=self.audio,
+                judge=self.judge,
+                caller_voice=caller_voice,
             )
         except GateRefused as exc:
             return GateAborted(f"The gate refused to start: {exc}.")
@@ -148,6 +228,14 @@ class FactoryApp:
         except anthropic.APIError as exc:
             return GateAborted(f"The judge call failed ({_api_error(exc)}); no verdict.")
         card = build_card(record)
+        if parent_run_id is not None:
+            card = card.model_copy(
+                update={
+                    "parent_run_id": parent_run_id,
+                    "agent_version": spec.version,
+                    "coach_note": coach_note,
+                }
+            )
         self.last_path = self.store.save(card)
         return card
 
@@ -166,15 +254,23 @@ class FactoryApp:
         return cards
 
     def agent_spec(self, agent_id: str) -> AgentSpec | None:
-        """The spec whose id is `agent_id`; only templates are persisted."""
+        """The spec whose id is `agent_id`: the latest coached version when a stored card holds
+        one (agent_version > 1), else the template."""
         for template_id in TEMPLATE_IDS:
             try:
                 spec = load_template(template_id)
             except TemplateNotAvailable:
                 continue
             if spec.id == agent_id:
-                return spec
+                return self._coached(agent_id) or spec
         return None
+
+    def _coached(self, agent_id: str) -> AgentSpec | None:
+        card = self.latest_card(agent_id)
+        if card is None or card.agent_version <= 1 or not card.agent_spec:
+            return None
+        checked = validate_agent_spec(card.agent_spec)
+        return checked if isinstance(checked, AgentSpec) else None
 
     def latest_card(self, agent_id: str) -> EvalCard | None:
         try:
@@ -247,5 +343,6 @@ def build_app(env: Mapping[str, str] | None, results_dir: Path) -> FactoryApp:
         judge=AnthropicJudge(llm, model_id=judge_model),
         store=FileCardStore(results_dir / "cards"),
         brief_model=AnthropicBriefModel(llm, model_id=judge_model),
+        coach_model=AnthropicCoachModel(llm, model_id=judge_model),
         _closers=(http.aclose, llm.close),
     )

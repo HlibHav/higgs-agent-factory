@@ -150,6 +150,10 @@ class BriefModel(Protocol):
     async def draft_spec(self, brief: str) -> str: ...
 
 
+class CoachModel(Protocol):
+    async def rewrite_procedure(self, prompt: str) -> str: ...
+
+
 class CardStorePort(Protocol):
     def save(self, card: "EvalCard") -> Path: ...
 

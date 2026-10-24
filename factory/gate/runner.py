@@ -304,7 +304,9 @@ class _Run:
         audio: TurnAudioSource,
         judge: JudgePort,
         sleep: Sleep,
+        caller_voice: str | None = None,
     ) -> None:
+        self.caller_voice = caller_voice  # AC-80: overrides every scenario's user_voice
         self.spec = spec
         self.sessions = sessions
         self.audio = audio
@@ -348,7 +350,9 @@ class _Run:
             label = f"{scenario.id} turn {index + 1}"
             try:
                 cache[index] = await self.audio.audio_for(
-                    scenario.user_turns[index], scenario.user_voice, label=label
+                    scenario.user_turns[index],
+                    self.caller_voice or scenario.user_voice,
+                    label=label,
                 )
             except AudioMissing as exc:
                 detail = f"{exc.turn_label}: {exc.cause}" if exc.cause else exc.turn_label
@@ -593,6 +597,7 @@ async def run_gate(
     judge: JudgePort,
     clock: Clock = time.monotonic,
     sleep: Sleep = asyncio.sleep,
+    caller_voice: str | None = None,
 ) -> GateRunRecord:
     """One session per scenario (AC-55), one audio meter for the run (AC-56). A cut-short run
     returns a record with `cause` set; a refused session raises `GateAborted` and yields no
@@ -602,6 +607,6 @@ async def run_gate(
     event times) comes from the session, so it is not read here.
     """
     check_limits(spec)
-    run = _Run(spec, sessions, audio, judge, sleep)
+    run = _Run(spec, sessions, audio, judge, sleep, caller_voice)
     await run.execute()
     return run.record(spec.id)

@@ -36,7 +36,15 @@ from factory.ports import (
     TranscriptDelta,
 )
 from factory.web.app import _Inbox, _Outbox, create_web_app
-from tests.doubles import Delay, FakeJudge, FakeSessionFactory, FakeTts, Refuse
+from tests.doubles import (
+    Delay,
+    FakeBriefModel,
+    FakeJudge,
+    FakeSessionFactory,
+    FakeTts,
+    Refuse,
+    make_spec,
+)
 from tests.fake_realtime_server import (
     audio_delta_event,
     close,
@@ -167,6 +175,100 @@ def test_spec_route_returns_the_agent_spec(tmp_path: Path) -> None:
     body = client.get(f"/api/agents/{AGENT}/spec").json()
     assert body == load_template(AGENT).model_dump(mode="json")  # AC-49
     assert client.get("/api/agents/nope/spec").status_code == 404
+
+
+def _skill(sid: str) -> dict[str, Any]:
+    return {
+        "id": sid,
+        "name": sid.title(),
+        "purpose": f"does {sid}",
+        "procedure": f"step for {sid}",
+        "tools": [],
+        "scenarios": [
+            {
+                "id": f"{sid}-1",
+                "title": f"{sid} scenario",
+                "user_voice": "chloe",
+                "user_turns": [{"text": "Hello there."}],
+                "expected_tool_call": None,
+                "rubric": {
+                    "pass_criteria": ["ok"],
+                    "partial_criteria": ["meh"],
+                    "fail_criteria": ["bad"],
+                },
+            }
+        ],
+    }
+
+
+def _two_skill_reply() -> str:
+    spec = make_spec()
+    spec.update(
+        schema_version=2,
+        persona="Be brief.",
+        skills=[_skill("greet"), _skill("quote")],
+    )
+    for old in ("instructions", "tools", "scenarios"):
+        spec.pop(old, None)
+    return json.dumps(spec)
+
+
+def test_spec_route_carries_persona_and_skills(tmp_path: Path) -> None:
+    body = _client(_app(tmp_path)).get(f"/api/agents/{AGENT}/spec").json()
+    assert body["persona"] and body["skills"]
+    assert {"id", "name", "purpose", "procedure", "tools", "scenarios"} <= set(body["skills"][0])
+
+
+def test_card_route_carries_skills_and_judge_agreement(tmp_path: Path) -> None:
+    _store_card(tmp_path, AGENT, "PASS")
+    card = _client(_app(tmp_path)).get(f"/api/agents/{AGENT}/card/latest").json()["card"]
+    assert card["skills"] and {"skill_id", "name", "scenarios_run", "passed"} <= set(
+        card["skills"][0]
+    )
+    assert "judge_agreement_rate" in card and "agent_version" in card
+    assert "agent_spec" not in card
+
+
+def test_coach_route_404_without_pair_and_200_with_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path)
+    client = _client(app)
+    assert client.get(f"/api/agents/{AGENT}/coach").status_code == 404
+    before, _ = _store_card(tmp_path, AGENT, "FAIL", run_id="20261024T120000Z-aa")
+    after, _ = _store_card(tmp_path, AGENT, "PASS", run_id="20261024T130000Z-bb")
+    monkeypatch.setattr(app, "coach_pair", lambda agent_id: (before, after), raising=False)
+    body = client.get(f"/api/agents/{AGENT}/coach").json()
+    assert body["before"]["verdict"] == "rejected" and body["after"]["verdict"] == "released"
+    assert body["diff"]["verdict"] == {"key": "verdict", "before": "rejected", "after": "released"}
+    assert body["diff"]["before_run_id"] == before.run_id
+    assert "agent_spec" not in body["after"]
+
+
+def test_brief_route_proposes_two_skills_without_a_gate_run(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    model = FakeBriefModel(_two_skill_reply())
+    app.brief_model = model
+    client = _client(app)
+    response = client.post("/api/brief", json={"brief": "a shop trainer"})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [k["id"] for k in body["skills"]] == ["greet", "quote"] and body["persona"]
+    assert model.calls == 1
+    assert list((tmp_path / "cards").glob("*/*")) == []  # AC-79: proposed, not gated
+
+
+def test_brief_route_errors(tmp_path: Path) -> None:
+    app = _app(tmp_path)
+    client = _client(app)
+    assert client.post("/api/brief", json={"brief": "hi"}).status_code == 503  # no model
+    model = FakeBriefModel("not json")
+    app.brief_model = model
+    long = client.post("/api/brief", json={"brief": "x" * 1001})
+    assert long.status_code == 400 and "1,000" in long.json()["detail"] and model.calls == 0
+    issues = client.post("/api/brief", json={"brief": "hi"})
+    assert issues.status_code == 422 and issues.json()["issues"][0]["field"] == "model_reply"
+    assert client.post("/api/brief", json={}).status_code == 400
 
 
 def test_scenarios_route(tmp_path: Path) -> None:
@@ -420,9 +522,13 @@ def test_ac37_no_key_in_any_response_or_message(tmp_path: Path) -> None:
         f"/api/agents/{AGENT}/card/latest",
         f"/api/agents/{AGENT}/scenarios",
         "/api/agents/nope/spec",
+        f"/api/agents/{AGENT}/coach",
         "/openapi.json",
     ]
     bodies += [client.get(p).text for p in paths]
+    built.brief_model = FakeBriefModel(_two_skill_reply())
+    bodies.append(client.post("/api/brief", json={"brief": "a trainer"}).text)
+    bodies.append(client.post("/api/brief", json={"brief": "x" * 1001}).text)
     bodies.append(client.post(f"/api/agents/{AGENT}/scenarios/nope/check").text)
     with client.websocket_connect(f"/ws/live/{AGENT}") as ws:
         for frame in _receive_until_end(ws):

@@ -24,7 +24,9 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
+from factory.agent_spec.generator import BriefTooLong, generate_from_brief
 from factory.composition import CheckFailed, FactoryApp
+from factory.gate.diff import diff_cards
 from factory.gate.render import render_card_text
 from factory.live.session import EndReason, LiveSink, Sleep, run_live
 from factory.ports import Clock
@@ -198,6 +200,13 @@ def _is_stop(text: str | None) -> bool:
     return isinstance(payload, dict) and payload.get("type") == "stop"
 
 
+def _card_json(card: Any) -> dict[str, Any]:
+    """Card as JSON for the page; the spec snapshot is large and the page has its own view."""
+    body: dict[str, Any] = json.loads(card.model_dump_json())
+    body.pop("agent_spec", None)
+    return body
+
+
 def _plain_ended(reason: EndReason, message: str) -> str:
     return json.dumps({"type": "ended", "reason": reason, "message": message})
 
@@ -256,7 +265,41 @@ def create_web_app(
         card = factory_app.latest_card(agent_id)
         if card is None:
             raise HTTPException(404, "no gate run yet")
-        return {"card": json.loads(card.model_dump_json()), "text": render_card_text(card)}
+        return {"card": _card_json(card), "text": render_card_text(card)}
+
+    @app.get("/api/agents/{agent_id}/coach")
+    async def coach(agent_id: str) -> dict[str, Any]:
+        pair_fn = getattr(factory_app, "coach_pair", None)
+        pair = pair_fn(agent_id) if pair_fn is not None else None
+        if pair is None:
+            raise HTTPException(404, "no coached version yet")
+        before, after = pair
+        return {
+            "before": _card_json(before),
+            "after": _card_json(after),
+            "diff": diff_cards(before, after).model_dump(mode="json"),
+        }
+
+    @app.post("/api/brief")
+    async def brief(payload: dict[str, Any]) -> Any:
+        text = payload.get("brief")
+        if not isinstance(text, str) or not text.strip():
+            raise HTTPException(400, "The brief is empty.")
+        if factory_app.brief_model is None:
+            raise HTTPException(503, "No brief model is configured.")
+        try:
+            generated = await generate_from_brief(text, factory_app.brief_model)
+        except BriefTooLong as exc:
+            raise HTTPException(400, str(exc)) from None
+        except Exception as exc:  # noqa: BLE001 - a model/API failure is a gateway error
+            raise HTTPException(
+                502, f"The brief model call failed ({type(exc).__name__})."
+            ) from None
+        if isinstance(generated, list):
+            return JSONResponse(
+                {"issues": [i.model_dump(mode="json") for i in generated]}, status_code=422
+            )
+        return generated.model_dump(mode="json")  # proposed, not gated: no gate run here (AC-79)
 
     @app.get("/api/agents/{agent_id}/scenarios")
     async def scenarios(agent_id: str) -> list[dict[str, str]]:

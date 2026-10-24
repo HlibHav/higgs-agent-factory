@@ -106,3 +106,31 @@ def test_brief_adapter_rejects_reply_without_text() -> None:
     client.messages.text = ""
     model = AnthropicBriefModel(client, model_id="m")
     assert asyncio.run(model.draft_spec("b")) == ""
+
+
+# --- AC-79: the generator proposes skills ---
+
+
+def test_ac79_two_skill_v2_reply_validates() -> None:
+    from factory.agent_spec.templates import load_template
+
+    raw = load_template("specialist-training").model_dump(mode="json")
+    raw["skills"] = raw["skills"][:2]
+    model = FakeBriefModel(json.dumps(raw))
+    result = asyncio.run(generate_from_brief("A coach for support trainees.", model))
+    assert isinstance(result, AgentSpec)
+    assert result.schema_version == 2
+    assert len(result.skills) == 2
+    assert result.source == BriefSource(text="A coach for support trainees.")
+
+
+def test_ac79_system_prompt_asks_for_skills_and_two_judge_calls() -> None:
+    from factory.agent_spec.brief_anthropic import _MAX_TOKENS, _SYSTEM
+
+    assert "2 judge calls" in _SYSTEM
+    assert "1 judge call" not in _SYSTEM
+    assert 'Set "schema_version" to 2' in _SYSTEM
+    assert "2 to 4 skills" in _SYSTEM
+    assert "never add a web_search tool" in _SYSTEM
+    assert json.dumps(AgentSpec.model_json_schema()) in _SYSTEM
+    assert _MAX_TOKENS == 8192

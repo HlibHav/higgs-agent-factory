@@ -138,7 +138,7 @@ def test_tool_template_shape_and_budget(template_id: str) -> None:
     spec = load_template(template_id)
     budget = spec.budget
     assert (budget.max_scenarios, budget.max_audio_s_per_run) == (6, 240)
-    assert (budget.max_judge_calls_per_scenario, budget.max_live_session_s) == (1, 180)
+    assert (budget.max_judge_calls_per_scenario, budget.max_live_session_s) == (2, 180)
     assert len(spec.scenarios) == budget.max_scenarios
     assert len({s.id for s in spec.scenarios}) == 6
     assert spec.voice == "default"  # F7
@@ -184,3 +184,26 @@ def test_tool_template_mocks_have_no_side_effects(template_id: str) -> None:
         assert required <= set(tool.parameters["properties"]), tool.name
         for case in tool.mock.by_argument:
             assert set(case.when) <= set(tool.parameters["properties"]), tool.name
+
+
+_PRE_MIGRATION_SCENARIOS = {
+    "health-insurance": {f"hi-{n}" for n in range(1, 7)},
+    "fraud-detection": {f"fd-{n}" for n in range(1, 7)},
+    "customer-support": {f"cs-{n}" for n in range(1, 7)},
+    "ai-receptionist": {f"ar-{n}" for n in range(1, 7)},
+    "specialist-training": {f"st-{n}" for n in range(1, 7)},
+}
+
+
+@pytest.mark.parametrize("template_id", TEMPLATE_IDS)
+def test_ac73_templates_are_skill_based_and_keep_every_scenario(template_id: str) -> None:
+    spec = load_template(template_id)
+    assert spec.schema_version == 2
+    assert len(spec.skills) >= 2
+    ids = [s.id for skill in spec.skills for s in skill.scenarios]
+    assert len(ids) == len(set(ids))  # each scenario sits under exactly one skill
+    assert set(ids) == _PRE_MIGRATION_SCENARIOS[template_id]
+    assert all(skill.scenarios for skill in spec.skills)
+    assert spec.budget.max_judge_calls_per_scenario == 2
+    tool_names = [t.name for skill in spec.skills for t in skill.tools]
+    assert len(tool_names) == len(set(tool_names))  # each tool sits under exactly one skill
