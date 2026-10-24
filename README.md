@@ -31,6 +31,12 @@ flowchart LR
 - **Coach.** One model call per failing skill rewrites that skill's procedure, then the full gate runs again.
 - **Demo page.** Pick a template or type a brief, inspect the spec, run a single scenario or the full gate, coach it, and talk to the agent live with your microphone. A Higgs Avatar view is available behind an opt-in toggle. An agent that has not passed the gate can still talk, but it carries a visible "not released" label.
 
+## Demo video
+
+The 2–3 minute walkthrough is not recorded yet; its link goes here once it is. Until then,
+[Quick start](#quick-start) runs the demo page locally, and [`docs/DEMO-RUNBOOK.md`](docs/DEMO-RUNBOOK.md)
+walks through what it shows.
+
 ## Results from live runs
 
 Every number below comes from a stored Eval Card in [`docs/evidence/`](docs/evidence/) and has a row in [`docs/CLAIMS.md`](docs/CLAIMS.md) with its method and its caveats.
