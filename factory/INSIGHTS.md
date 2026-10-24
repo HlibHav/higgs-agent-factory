@@ -25,10 +25,17 @@ Insert-only. Format and rules: `engineering-paved-path:engineering-insights` (`r
 - 2026-10-24: One run per scenario is noisy. On `brief-onboarding-buddy-b948ed`, book-call-slot-taken went PASS → FAIL between v1 and v2 although the coach had not touched its skill. The k = 2 judge only measures judge noise, not agent noise. Running each scenario n times (pass^n) would separate the two.
 - 2026-10-24: The coach page diff compares the latest card with its parent (v2 → v3), not with the first version. Read the chain of parent run ids for the full story.
 
+- 2026-10-24 (film): The demo page creates its AudioContext only on the Start click, but the film recorder loads caller audio and starts the take before that. `tap.js` makes the 24 kHz context early and hands it back to the page's `new AudioContext`. The spike missed this because it started live first; drive the real run order in a spike.
+- 2026-10-24 (film): A take is a "candidate" when the agent's audio stopped on T2, which says nothing about what it said next. In run `20261024T203615Z-34b33d` take 2 passed the audio rule while its reply answered T1. The T2 transcript in the take log is what catches it; the keeper stays a human call.
+- 2026-10-24 (film): At 1920×1080 the page's TTFA readout sits near y ≈ 2500 of a 2613 px page, out of frame. `tap.js` scrolls it into view; `test_ttfa_label_in_viewport` is the canary if the page layout changes.
+
 ## Tool & Library Notes
 
 - 2026-10-24: `AsyncAnthropic.messages.create` is overloaded; a Protocol member typed as a read-only property returning `Callable[..., Awaitable[Any]]` satisfies mypy, a plain `async def create(**kwargs)` does not.
 - 2026-10-24: pipecat and pipecat-boson ship no type hints; mypy ignores them per module (`pyproject.toml`).
+- 2026-10-24 (film): Homebrew ffmpeg 9.0.1 has neither `subtitles` nor `drawtext`, so captions are a transparent ProRes 4444 overlay rendered by Remotion and laid on with `overlay`. The concat demuxer resolves relative list entries against the list file's folder: write absolute paths.
+- 2026-10-24 (film): `/opt/anaconda3/bin/node` (v20) shadows Homebrew's node 24 on PATH; run `demo-film-graphics` with `/opt/homebrew/bin` first. Remotion 4.0.528 needs zod pinned to exactly 4.5.4.
+- 2026-10-24 (film): Chromium accepts a MediaStream built with `createMediaStreamDestination()` in the page's own context as the result of an overridden `getUserMedia`, headless, with no fake-device flag or permission grant.
 
 ## Recurring Errors & Fixes
 
