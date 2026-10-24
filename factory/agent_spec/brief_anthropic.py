@@ -6,6 +6,7 @@ adapter holds neither. The client is typed structurally so tests pass a fake, wi
 """
 
 import json
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from factory.agent_spec.models import AgentSpec
@@ -29,13 +30,16 @@ JSON Schema:
 
 
 class _Messages(Protocol):
-    async def create(self, **kwargs: Any) -> Any: ...
+    # A read-only callable attribute, so the SDK's overloaded `create` satisfies it.
+    @property
+    def create(self) -> Callable[..., Awaitable[Any]]: ...
 
 
 class MessagesClient(Protocol):
     """The slice of `anthropic.AsyncAnthropic` this adapter uses."""
 
-    messages: _Messages
+    @property
+    def messages(self) -> _Messages: ...
 
 
 class AnthropicBriefModel:
