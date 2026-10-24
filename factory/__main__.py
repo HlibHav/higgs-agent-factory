@@ -1,4 +1,5 @@
-"""CLI entry: `python -m factory gate --template specialist-training`.
+"""CLI entry: `python -m factory gate --template specialist-training`, or
+`python -m factory serve [--port 8000]` for the demo page (127.0.0.1 only).
 
 Exit codes: 0 when a gate run completed and a card was stored (whatever its verdict, including
 `incomplete`; the verdict is printed); 2 for a refusal, abort, spec issues or missing config,
@@ -7,7 +8,6 @@ where no card is stored. Keys come from the environment only.
 
 import argparse
 import asyncio
-import os
 import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -21,8 +21,11 @@ from factory.gate.runner import GateAborted
 
 DEFAULT_RESULTS_DIR = Path("results")
 EXIT_REFUSED = 2
+DEFAULT_PORT = 8000
+SERVE_HOST = "127.0.0.1"  # a local single-user tool: never bind a public interface
 
-AppFactory = Callable[[Mapping[str, str], Path], Any]
+AppFactory = Callable[[Mapping[str, str] | None, Path], Any]
+ServerRunner = Callable[..., Any]
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -32,6 +35,8 @@ def _parser() -> argparse.ArgumentParser:
     source = gate.add_mutually_exclusive_group(required=True)
     source.add_argument("--template", choices=TEMPLATE_IDS)
     source.add_argument("--brief", help="free-text brief (max 1,000 characters)")
+    serve = sub.add_parser("serve", help="serve the demo page on 127.0.0.1")
+    serve.add_argument("--port", type=int, default=DEFAULT_PORT)
     return parser
 
 
@@ -63,14 +68,30 @@ def main(
     env: Mapping[str, str] | None = None,
     results_dir: Path = DEFAULT_RESULTS_DIR,
     app_factory: AppFactory = build_app,
+    server_runner: ServerRunner | None = None,
 ) -> int:
     args = _parser().parse_args(argv)
     try:
-        app = app_factory(os.environ if env is None else env, results_dir)
+        app = app_factory(
+            env, results_dir
+        )  # None: the composition root reads the process environment
     except ConfigError as exc:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return EXIT_REFUSED
+    if args.command == "serve":
+        return _serve(app, args.port, server_runner)
     return asyncio.run(_run(app, args))
+
+
+def _serve(app: Any, port: int, runner: ServerRunner | None) -> int:
+    import uvicorn
+
+    from factory.web.app import create_web_app
+
+    run = runner or uvicorn.run
+    # `ws="websockets"` pins the implementation: uvicorn's `auto` choice is not documented.
+    run(create_web_app(app), host=SERVE_HOST, port=port, ws="websockets")
+    return 0
 
 
 if __name__ == "__main__":

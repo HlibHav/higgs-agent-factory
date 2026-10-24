@@ -1,6 +1,6 @@
 # Spec: IHBench client for Higgs Realtime
 Spec ID: SPEC-2026-10-24-ihbench-higgs-client
-Status: approved
+Status: implemented
 Tier: Full SDD — scorecard 4/6 (raised by spec-creator from the main session's 3/6, Lightweight: Q2 became "yes" because a sample's multi-turn history can be replayed two ways)
 Supersedes: none
 Packages: the fork `../ihbench-higgs` of `boson-ai/ihbench`, branch `feat/higgs-realtime-client`, PR to `boson-ai/ihbench`. The spec lives in this repo. The code lives in the fork.
@@ -249,44 +249,44 @@ None open. Resolved on 2026-10-24:
 
 | AC | proof | verify | step | test | commit |
 |---|---|---|---|---|---|
-| AC-1 | red-first unit | silent fake server; first client message is `session.update` | — | — | — |
-| AC-2 | red-first unit | first update has model `higgs-realtime`, instructions = system message | — | — | — |
-| AC-3 | red-first unit | first update `output_modalities` exactly `["text"]` | — | — | — |
-| AC-4 | red-first unit | first update has turn detection null at the F24 path, nowhere else | — | — | — |
-| AC-5 | red-first unit | `max_new_tokens` 4096 becomes `max_output_tokens` 4096 | — | — | — |
-| AC-6 | red-first unit | only `session.created` sent; replay starts | — | — | — |
-| AC-7 | red-first unit | three audio turns; no audio in any item create | — | — | — |
-| AC-8 | red-first unit | 40 s WAV; ≥ 2 appends ≤ 1 MiB each, one commit | — | — | — |
-| AC-9 | red-first unit | 2.0 s 16 kHz stereo WAV becomes 96,000 bytes ± 1 frame | — | — | — |
-| AC-10 | red-first unit | user turn as text becomes one `input_text` item | — | — | — |
-| AC-11 | red-first unit | assistant turn becomes a `text` item; no `output_text` | — | — | — |
-| AC-12 | red-first unit | empty assistant turn sends nothing | — | — | — |
-| AC-13 | red-first unit | `committed` delayed 200 ms; next item waits | — | — | — |
-| AC-14 | e2e | live multi-turn sample; audio `previous_item_id` chain matches history, no response before `response.create`, text-item acks logged | — | — | — |
-| AC-15 | red-first unit | no `conversation.item.done` ever; sample completes | — | — | — |
-| AC-16 | red-first unit | 5-item history; one `response.create` after the last item | — | — | — |
-| AC-17 | red-first unit | deltas "Of","ten","!" + completed `response.done` return "Often!" | — | — | — |
-| AC-18 | red-first unit | unknown events injected; same text returned | — | — | — |
-| AC-19 | red-first unit | `error` event fails the attempt; one log line with its type | — | — | — |
-| AC-20 | red-first unit | closes 4429 / 3000 / 1013 / after idle timeout each fail, naming the cause, one log line each | — | — | — |
-| AC-21 | red-first unit | no `response.done`; failure, close and one log line at 60 s | — | — | — |
-| AC-22 | red-first unit | unset / empty / placeholder key; zero connections, message names `BOSON_API_KEY` | — | — | — |
-| AC-23 | red-first unit | sentinel key absent from all failure output | — | — | — |
-| AC-24 | red-first unit | backend `higgs-realtime` builds the Higgs client with model and key | — | — | — |
-| AC-25 | red-first unit | backend `openai-realtime` builds the same client and args as upstream main | — | — | — |
-| AC-26 | e2e | main session: PR file list = 3 files; runner diff = choices line modified + one added branch, docstring untouched | — | — | — |
-| AC-27 | red-first unit | config has the five values | — | — | — |
-| AC-28 | e2e | live run with `--max-workers 1 --limit 10`; output has 10 lines | — | — | — |
-| AC-29 | e2e | all 10 rows carry the five keys | — | — | — |
-| AC-30 | e2e | all 10 responses non-empty after trim | — | — | — |
-| AC-31 | e2e | final line "10 responses saved …, 0 failures." | — | — | — |
-| AC-32 | e2e | zero AC-19/20/21/34/36 failed-attempt lines in the run's stderr | — | — | — |
-| AC-33 | red-first unit | non-empty system message; zero `system`-role items sent | — | — | — |
-| AC-34 | red-first unit | WAV with zero frames; attempt fails, nothing sent for that turn, one log line | — | — | — |
-| AC-35 | red-first unit | runner temperature 1.0; no temperature field in any client message | — | — | — |
-| AC-36 | red-first unit | "Of" then cancelled `response.done`; attempt fails, one log line, no text returned | — | — | — |
-| AC-37 | red-first unit | handshake carries the F23 auth header with the key; no key in the URL | — | — | — |
-| AC-38 | red-first unit | offline suite green on the minimum and the newest WebSocket library version; 1013 reported by code | — | — | — |
+| AC-1 | red-first unit | silent fake server; first client message is `session.update` | 3 | `test_first_message_is_session_update`, not run (file only on test branch); partial (C:174) | not in review evidence |
+| AC-2 | red-first unit | first update has model `higgs-realtime`, instructions = system message | 3 | `test_session_update_model_and_instructions`, not run (file only on test branch); partial (C:89, C:91) | not in review evidence |
+| AC-3 | red-first unit | first update `output_modalities` exactly `["text"]` | 3 | `test_session_update_text_only`, not run (file only on test branch); partial (C:90) | not in review evidence |
+| AC-4 | red-first unit | first update has turn detection null at the F24 path, nowhere else | 3 | `test_turn_detection_null_at_f24_path_only`, not run (file only on test branch); partial (C:93; VAD effect rests on AC-14) | not in review evidence |
+| AC-5 | red-first unit | `max_new_tokens` 4096 becomes `max_output_tokens` 4096 | 3 | `test_max_output_tokens_from_max_new_tokens`, not run (file only on test branch); partial (C:92) | not in review evidence |
+| AC-6 | red-first unit | only `session.created` sent; replay starts | 4 | `test_replay_starts_after_session_created_only`, not run (file only on test branch); partial (C:175) | not in review evidence |
+| AC-7 | red-first unit | three audio turns; no audio in any item create | 4 | `test_no_audio_in_item_create`, not run (file only on test branch); partial (C:107-117, C:180) | not in review evidence |
+| AC-8 | red-first unit | 40 s WAV; ≥ 2 appends ≤ 1 MiB each, one commit | 4 | `test_long_wav_split_into_appends_then_one_commit`, not run (file only on test branch); partial (C:57-60, C:179-181; 2-append live sample ac608127_1 succeeded) | not in review evidence |
+| AC-9 | red-first unit | 2.0 s 16 kHz stereo WAV becomes 96,000 bytes ± 1 frame | 4 | `test_audio_resampled_to_24k_mono_pcm16`, not run (file only on test branch); partial (C:102, helper not opened) | not in review evidence |
+| AC-10 | red-first unit | user turn as text becomes one `input_text` item | 4 | `test_text_user_turn_is_input_text_item`, not run (file only on test branch); partial (C:106-111) | not in review evidence |
+| AC-11 | red-first unit | assistant turn becomes a `text` item; no `output_text` | 4 | `test_assistant_turn_is_text_item`, not run (file only on test branch); partial (C:112-117) | not in review evidence |
+| AC-12 | red-first unit | empty assistant turn sends nothing | 4 | `test_empty_assistant_turn_sends_nothing`, not run (file only on test branch); partial (C:112) | not in review evidence |
+| AC-13 | red-first unit | `committed` delayed 200 ms; next item waits | 4 | `test_next_item_waits_for_committed`, not run (file only on test branch); partial (C:181-182) | not in review evidence |
+| AC-14 | e2e | live multi-turn sample; audio `previous_item_id` chain matches history, no response before `response.create`, text-item acks logged | 8 | `tests/live_replay_order.py`, no run in review evidence; unverifiable (main session, live) | not in review evidence |
+| AC-15 | red-first unit | no `conversation.item.done` ever; sample completes | 4 | `test_completes_without_item_done`, not run (file only on test branch); partial (no item.done wait in C) | not in review evidence |
+| AC-16 | red-first unit | 5-item history; one `response.create` after the last item | 4 | `test_one_response_create_after_last_item`, not run (file only on test branch); partial (C:187) | not in review evidence |
+| AC-17 | red-first unit | deltas "Of","ten","!" + completed `response.done` return "Often!" | 5 | `test_returns_concatenated_deltas_on_completed`, not run (file only on test branch); partial (C:154-155, C:192-194) | not in review evidence |
+| AC-18 | red-first unit | unknown events injected; same text returned | 5 | `test_unknown_events_ignored`, not run (file only on test branch); partial (C:156) | not in review evidence |
+| AC-19 | red-first unit | `error` event fails the attempt; one log line with its type | 5 | `test_error_event_fails_attempt`, not run (file only on test branch); partial (C:145-151, C:213) | not in review evidence |
+| AC-20 | red-first unit | closes 4429 / 3000 / 1013 / after idle timeout each fail, naming the cause, one log line each | 5 | `test_close_fails_attempt_naming_cause`, not run; NOT MET: a close during `ws.send` escapes as raw `ConnectionClosedError` with no log line, reproduced on websockets 17.3 and 12.0 (correctness `repro_close_raw.py`); OPEN | not in review evidence |
+| AC-21 | red-first unit | no `response.done`; failure, close and one log line at 60 s | 5 | `test_attempt_timeout_closes_and_fails`, `test_default_attempt_timeout_is_60s`, not run; NOT MET: close handshake runs past the bound, 1 s timeout took 11.0 s (17.3) / 31.0 s (12.0) (correctness `repro_timeout.py`); OPEN | not in review evidence |
+| AC-22 | red-first unit | unset / empty / placeholder key; zero connections, message names `BOSON_API_KEY` | 3 | `test_bad_key_fails_before_connect`, not run (file only on test branch); partial (C:74-76) | not in review evidence |
+| AC-23 | red-first unit | sentinel key absent from all failure output | 5 | `test_key_never_in_failure_output`, not run (file only on test branch); partial (C:80-81, key only at C:166; 12.x redirect finding NEEDS-GLIB) | not in review evidence |
+| AC-24 | red-first unit | backend `higgs-realtime` builds the Higgs client with model and key | 6 | `test_runner_builds_higgs_client`, not run (file only on test branch); partial (R:47-50) | not in review evidence |
+| AC-25 | red-first unit | backend `openai-realtime` builds the same client and args as upstream main | 6 | `test_runner_openai_realtime_unchanged`, not run (file only on test branch); partial (R:43-46) | not in review evidence |
+| AC-26 | e2e | main session: PR file list = 3 files; runner diff = choices line modified + one added branch, docstring untouched | 8 | main-session `git diff upstream/main...feat/higgs-realtime-client`, run by security and correctness reviewers ("the 3-file diff"); partial: choices-line-plus-one-elif not confirmed by any reviewer | not in review evidence |
+| AC-27 | red-first unit | config has the five values | 2 | `test_config_has_five_values`, not run (file only on test branch); partial (Y:1-5) | not in review evidence |
+| AC-28 | e2e | live run with `--max-workers 1 --limit 10`; output has 10 lines | 8 | live smoke `responses/higgs-realtime.jsonl`; partial: correctness summary says 10 rows, no line-count command in evidence | not in review evidence |
+| AC-29 | e2e | all 10 rows carry the five keys | 8 | live smoke, keys per row; unverifiable (not checked by any reviewer) | not in review evidence |
+| AC-30 | e2e | all 10 responses non-empty after trim | 8 | live smoke, non-empty responses; unverifiable (not checked by any reviewer) | not in review evidence |
+| AC-31 | e2e | final line "10 responses saved …, 0 failures." | 8 | live smoke, final stderr line; unverifiable (not checked by any reviewer) | not in review evidence |
+| AC-32 | e2e | zero AC-19/20/21/34/36 failed-attempt lines in the run's stderr | 8 | `grep -c 'attempt failed' responses/higgs-realtime.stderr.log` -> 0; partial: send-side closes are never logged (AC-20 finding), so the count can miss retried failures | not in review evidence |
+| AC-33 | red-first unit | non-empty system message; zero `system`-role items sent | 4 | `test_no_system_role_item`, not run (file only on test branch); partial (C:97-118) | not in review evidence |
+| AC-34 | red-first unit | WAV with zero frames; attempt fails, nothing sent for that turn, one log line | 4 | `test_zero_sample_wav_fails_before_sending`, not run (file only on test branch); partial (C:103-104, C:203) | not in review evidence |
+| AC-35 | red-first unit | runner temperature 1.0; no temperature field in any client message | 3 | `test_no_temperature_sent`, not run (file only on test branch); partial (C:85-95, C:180-187) | not in review evidence |
+| AC-36 | red-first unit | "Of" then cancelled `response.done`; attempt fails, one log line, no text returned | 5 | `test_cancelled_response_fails`, not run (file only on test branch); partial (C:192-193) | not in review evidence |
+| AC-37 | red-first unit | handshake carries the F23 auth header with the key; no key in the URL | 3 | `test_handshake_bearer_header_no_key_in_url`, not run (file only on test branch); partial (C:33, C:166, C:170) | not in review evidence |
+| AC-38 | red-first unit | offline suite green on the minimum and the newest WebSocket library version; 1013 reported by code | 3, 5, 7 | `test_headers_kwarg_by_version`, `test_connect_uses_kwarg_of_installed_version`, neither venv suite run; NOT MET: AC-20 defect reproduced on 17.3 and 12.0, and on 12.x the Bearer key follows a cross-origin redirect (NEEDS-GLIB) | not in review evidence |
 
 The red-first unit tests run against a fake WebSocket server and live on a separate branch of the fork, not in the PR (Glib, Q6). The e2e checks need `BOSON_API_KEY` and spend credits, except AC-26, which reads the PR diff and is run by the main session.
 
@@ -297,3 +297,5 @@ The red-first unit tests run against a fake WebSocket server and live on a separ
 | 2026-10-24 | Spec created as draft, Full SDD 4/6 (create plus answers mode). | P0 of `docs/BRIEF.md`. Glib answered Q1–Q6 and the runner-edit question, and research added F14, F16, F20 and F21. After the live smoke the F2 wording was aligned (docs and wire disagree on usage). F1, F5 and F14 are now VERIFIED-RUN; ids unchanged. |
 | 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word because the editor change was not saved to disk. |
 | 2026-10-24 | Update mode, planner blocker. The smoke command gains `--max-workers 1`, and the YAML `max_workers` becomes documentation only. New ACs: AC-34 (zero-sample WAV fails), AC-35 (no temperature sent), AC-36 (cancelled response fails), AC-37 (auth per F23), AC-38 (whole allowed WebSocket library range). AC-4 now cites F24. AC-14 checks audio order and that no response starts early. AC-26 is proven by the main session. AC-10 and the edge cases note that the runner drops a turn's text when a WAV exists. All four open markers were closed. Status left as approved. | `sdd-engineering:implementation-planner` returned needs-answers: the runner ignores YAML `max_workers` (CLI default 8 wins) and drops the text of WAV turns. Glib answered the worker, empty-WAV, cancelled-response and protocol-fact questions, and the planner's defaults closed the open markers. The plan needs re-review. |
+| 2026-10-24 | traceability filled after review loop | Claude |
+| 2026-10-24 | Status set to implemented by Glib after the review loop (`docs/plans/2026-10-24-ihbench-higgs-client.verify.md`): no must-close; close handling and close timeout fixed in `abd6bd9`. | Glib, in chat. |

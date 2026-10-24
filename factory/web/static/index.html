@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Higgs Agent Factory</title>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --panel: #ffffff;
+    --ink: #1c1b19;
+    --muted: #5d5a53;
+    --line: #d9d6cd;
+    --accent: #2f5bd3;
+    --accent-ink: #ffffff;
+    --pass: #1d7a3e;
+    --partial: #9a6400;
+    --fail: #b3261e;
+    --warn-bg: #fff1d6;
+    --warn-ink: #6b4300;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 18px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { margin: 0; font-size: 1.5rem; }
+  header .sub { color: var(--muted); }
+  main { max-width: 1240px; margin: 0 auto; padding: 16px 24px 48px; }
+  section {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 20px; margin-bottom: 18px;
+  }
+  section > h2 { margin: 0 0 12px; font-size: 1.35rem; display: flex; align-items: center; gap: 10px; }
+  .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.8rem; height: 1.8rem; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); font-size: 1.05rem;
+  }
+  .muted { color: var(--muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .tcard {
+    text-align: left; font: inherit; color: inherit; cursor: pointer;
+    background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 12px;
+  }
+  .tcard:hover { border-color: var(--accent); }
+  .tcard[aria-pressed="true"] { border-color: var(--accent); background: #e8eefc; }
+  .tcard:disabled { cursor: not-allowed; opacity: .6; }
+  .tcard .name { font-weight: 700; font-size: 1.1rem; display: block; margin-bottom: 4px; }
+  .tcard .desc { color: var(--muted); font-size: .9rem; }
+  .spec { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .spec h3, .gate h3 { margin: 0 0 8px; font-size: 1.15rem; }
+  dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; }
+  .persona { white-space: pre-wrap; max-height: 9em; overflow: auto; background: var(--bg); padding: 8px; border-radius: 6px; font-size: .9rem; }
+  ul.plain { margin: 4px 0 0; padding-left: 20px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .verdict {
+    display: inline-block; font-weight: 800; letter-spacing: .04em; padding: 2px 10px;
+    border-radius: 6px; border: 2px solid currentColor; font-size: 1.1rem;
+  }
+  .v-released, .l-PASS { color: var(--pass); }
+  .v-rejected, .l-FAIL { color: var(--fail); }
+  .v-incomplete, .l-PARTIAL { color: var(--partial); }
+  .label { font-weight: 700; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  pre {
+    font-family: var(--mono); font-size: .78rem; background: #1f1e1c; color: #f1efe8;
+    padding: 10px 12px; border-radius: 6px; overflow: auto; max-height: 320px; white-space: pre;
+  }
+  details summary { cursor: pointer; color: var(--muted); margin-top: 8px; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  select, button.btn {
+    font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  }
+  button.btn { cursor: pointer; font-weight: 600; }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.btn.stop { background: var(--fail); color: #fff; border-color: var(--fail); }
+  button.btn:disabled { opacity: .45; cursor: not-allowed; }
+  .running { font-weight: 700; color: var(--accent); }
+  .check { margin-top: 12px; border: 2px dashed var(--line); border-radius: 8px; padding: 10px 12px; }
+  .marker {
+    display: inline-block; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--muted);
+  }
+  .banner {
+    background: var(--warn-bg); color: var(--warn-ink); border: 2px solid var(--warn-ink);
+    border-radius: 8px; padding: 8px 14px; font-weight: 800; font-size: 1.2rem; letter-spacing: .03em;
+  }
+  .hint { background: #eef3ff; border-radius: 8px; padding: 6px 12px; }
+  .status { font-size: 1.05rem; font-weight: 600; min-height: 1.5em; }
+  .status.err { color: var(--fail); }
+  .timer { font-family: var(--mono); font-size: 1.4rem; font-weight: 700; }
+  .meter { width: 200px; height: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .meter > div { height: 100%; width: 0%; background: var(--pass); transition: width 60ms linear; }
+  ol.ttfa { margin: 6px 0 0; padding-left: 26px; font-family: var(--mono); font-size: 1.05rem; }
+  .ttfa-label { color: var(--muted); }
+  .transcript { max-height: 160px; overflow: auto; background: var(--bg); border-radius: 6px; padding: 8px; font-size: .92rem; }
+  .transcript p { margin: 0 0 6px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Higgs Agent Factory</h1>
+  <span class="sub">brief &rarr; voice agent &rarr; eval gate &rarr; live talk</span>
+</header>
+<main>
+  <section id="s1">
+    <h2><span class="num">1</span> Pick a template</h2>
+    <div id="templates" class="cards" aria-live="polite"><span class="muted">Loading templates&hellip;</span></div>
+    <div id="spec" class="spec" hidden></div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="num">2</span> Gate: Eval Card + one live scenario</h2>
+    <div id="gateEmpty" class="muted">Pick a template first.</div>
+    <div id="gateBody" class="cols" hidden>
+      <div class="gate">
+        <h3>Stored Eval Card (latest full gate run)</h3>
+        <div id="card"></div>
+      </div>
+      <div class="gate">
+        <h3>Run one scenario live</h3>
+        <div class="row">
+          <label for="scenarioSel" class="muted">Scenario</label>
+          <select id="scenarioSel"></select>
+          <button id="runCheck" class="btn primary" type="button">Run one scenario live</button>
+        </div>
+        <p id="checkStatus" class="running" aria-live="polite"></p>
+        <div id="checkResult" class="check" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="num">3</span> Talk to the agent</h2>
+    <div class="row">
+      <button id="startBtn" class="btn primary" type="button" disabled>Start</button>
+      <button id="stopBtn" class="btn stop" type="button" disabled>Stop</button>
+      <span class="timer" id="timer">00:00 / --:--</span>
+      <span class="muted">Mic</span><div class="meter" aria-hidden="true"><div id="meterBar"></div></div>
+      <span class="hint">Use headphones: the agent's own voice would otherwise interrupt it.</span>
+    </div>
+    <p id="notReleased" class="banner" hidden>NOT RELEASED: this agent's latest gate verdict is not "released".</p>
+    <p id="liveStatus" class="status" aria-live="polite">Pick a template, then press Start.</p>
+    <div class="cols">
+      <div>
+        <strong>TTFA per assistant turn</strong>
+        <div id="ttfaLabel" class="ttfa-label"></div>
+        <ol id="ttfaList" class="ttfa"></ol>
+      </div>
+      <div>
+        <strong>Assistant transcript</strong>
+        <div id="transcript" class="transcript"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, opts, kids) => {
+    const n = document.createElement(tag);
+    if (opts) {
+      if (opts.cls) n.className = opts.cls;
+      if (opts.text !== undefined && opts.text !== null) n.textContent = String(opts.text);
+      if (opts.attrs) for (const k of Object.keys(opts.attrs)) n.setAttribute(k, opts.attrs[k]);
+    }
+    if (kids) for (const k of kids) if (k) n.appendChild(k);
+    return n;
+  };
+  const fmtMs = (v) => (typeof v === "number" && isFinite(v)) ? Math.round(v) + " ms" : "n/a";
+  const fmtNum = (v, d) => (typeof v === "number" && isFinite(v)) ? v.toFixed(d) : "n/a";
+  const fmtClock = (s) => {
+    s = Math.max(0, Math.floor(s));
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  };
+  const verdictEl = (v) => {
+    if (v === null || v === undefined) return el("span", { cls: "muted", text: "no stored verdict" });
+    const word = String(v);
+    return el("span", { cls: "verdict v-" + word.replace(/[^a-z]/g, ""), text: word.toUpperCase() });
+  };
+  const labelEl = (l) => {
+    if (l === null || l === undefined) return el("span", { cls: "muted", text: "no label" });
+    return el("span", { cls: "label l-" + String(l).replace(/[^A-Z]/g, ""), text: String(l) });
+  };
+  const kv = (pairs) => {
+    const dl = el("dl", { cls: "kv" });
+    for (const [k, v] of pairs) {
+      dl.appendChild(el("dt", { text: k }));
+      const dd = el("dd");
+      if (v instanceof Node) dd.appendChild(v); else dd.textContent = (v === null || v === undefined) ? "n/a" : String(v);
+      dl.appendChild(dd);
+    }
+    return dl;
+  };
+  async function getJson(url, opts) {
+    const r = await fetch(url, opts);
+    let body = null;
+    try { body = await r.json(); } catch (_) { body = null; }
+    return { ok: r.ok, status: r.status, body };
+  }
+  const detailOf = (res) => (res.body && typeof res.body.detail === "string") ? res.body.detail : ("HTTP " + res.status);
+
+  // ---------- state ----------
+  let templates = [];
+  let selected = null;      // { template, spec, agentId }
+  let scenarios = [];
+  let checkPending = false;
+  let live = null;          // live session state, null when idle
+
+  // ---------- 1: templates + spec ----------
+  async function loadTemplates() {
+    const box = $("templates");
+    let res;
+    try { res = await getJson("/api/templates"); } catch (e) {
+      box.replaceChildren(el("span", { cls: "status err", text: "Could not load templates: " + e.message }));
+      return;
+    }
+    if (!res.ok || !Array.isArray(res.body)) {
+      box.replaceChildren(el("span", { cls: "status err", text: "Could not load templates: " + detailOf(res) }));
+      return;
+    }
+    templates = res.body;
+    box.replaceChildren();
+    for (const t of templates) {
+      const b = el("button", { cls: "tcard", attrs: { type: "button", "aria-pressed": "false" } }, [
+        el("span", { cls: "name", text: t.name }),
+        el("span", { cls: "desc", text: t.description }),
+      ]);
+      b.addEventListener("click", () => selectTemplate(t, b));
+      box.appendChild(b);
+    }
+  }
+
+  async function selectTemplate(t, btn) {
+    if (live) return; // no switching during a live session
+    for (const b of $("templates").children) b.setAttribute("aria-pressed", "false");
+    btn.setAttribute("aria-pressed", "true");
+    const specBox = $("spec");
+    specBox.hidden = false;
+    specBox.replaceChildren(el("span", { cls: "muted", text: "Loading Agent Spec…" }));
+    selected = null;
+    $("startBtn").disabled = true;
+    resetGate();
+    let res;
+    try { res = await getJson("/api/agents/" + encodeURIComponent(t.template_id) + "/spec"); } catch (e) {
+      specBox.replaceChildren(el("span", { cls: "status err", text: "Could not load the Agent Spec: " + e.message }));
+      return;
+    }
+    if (!res.ok || !res.body) {
+      specBox.replaceChildren(el("span", { cls: "status err", text: "Could not load the Agent Spec: " + detailOf(res) }));
+      return;
+    }
+    const spec = res.body;
+    const agentId = (typeof spec.id === "string" && spec.id) ? spec.id : t.template_id;
+    selected = { template: t, spec, agentId };
+    renderSpec(t, spec);
+    $("startBtn").disabled = false;
+    $("liveStatus").textContent = "Ready. Press Start to talk to " + t.name + ".";
+    $("liveStatus").className = "status";
+    loadGate();
+  }
+
+  function renderSpec(t, spec) {
+    const b = spec.budget || {};
+    const scenList = el("ul", { cls: "plain" });
+    for (const s of (spec.scenarios || [])) scenList.appendChild(el("li", { text: s.title + " (" + s.id + ")" }));
+    const tools = (spec.tools || []).map((x) => x.name).join(", ") || "none";
+    const persona = el("div", { cls: "persona", text: (spec.role ? spec.role + "\n\n" : "") + (spec.instructions || "") });
+    const budget = el("ul", { cls: "plain" }, [
+      el("li", { text: "max scenarios: " + b.max_scenarios }),
+      el("li", { text: "max audio per run: " + b.max_audio_s_per_run + " s" }),
+      el("li", { text: "max judge calls per scenario: " + b.max_judge_calls_per_scenario }),
+      el("li", { text: "max live session: " + b.max_live_session_s + " s" }),
+    ]);
+    const raw = el("details", null, [el("summary", { text: "Raw Agent Spec JSON" }), el("pre", { text: JSON.stringify(spec, null, 2) })]);
+    $("spec").replaceChildren(
+      el("h3", { text: "Agent Spec: " + t.name }),
+      kv([
+        ["Name", t.name],
+        ["Agent id", spec.id],
+        ["Persona", persona],
+        ["Voice", spec.voice],
+        ["Tools", tools],
+        ["Scenarios", scenList],
+        ["Budget", budget],
+      ]),
+      raw,
+    );
+  }
+
+  // ---------- 2: gate ----------
+  function resetGate() {
+    $("gateEmpty").hidden = false;
+    $("gateBody").hidden = true;
+    $("card").replaceChildren();
+    $("scenarioSel").replaceChildren();
+    $("checkStatus").textContent = "";
+    $("checkResult").hidden = true;
+    $("checkResult").replaceChildren();
+  }
+
+  async function loadGate() {
+    if (!selected) return;
+    const sel = selected;
+    $("gateEmpty").hidden = true;
+    $("gateBody").hidden = false;
+    $("card").replaceChildren(el("span", { cls: "muted", text: "Loading stored Eval Card…" }));
+    const id = encodeURIComponent(sel.agentId);
+    const [cardRes, scenRes] = await Promise.all([
+      getJson("/api/agents/" + id + "/card/latest").catch((e) => ({ ok: false, status: 0, body: { detail: e.message } })),
+      getJson("/api/agents/" + id + "/scenarios").catch((e) => ({ ok: false, status: 0, body: { detail: e.message } })),
+    ]);
+    if (selected !== sel) return;
+    if (cardRes.status === 404) {
+      $("card").replaceChildren(el("p", { cls: "status", text: "No gate run yet." }));
+    } else if (!cardRes.ok || !cardRes.body || !cardRes.body.card) {
+      $("card").replaceChildren(el("p", { cls: "status err", text: "Could not load the Eval Card: " + detailOf(cardRes) }));
+    } else {
+      renderCard(cardRes.body.card, cardRes.body.text);
+    }
+    const s = $("scenarioSel");
+    s.replaceChildren();
+    scenarios = (scenRes.ok && Array.isArray(scenRes.body)) ? scenRes.body : [];
+    for (const sc of scenarios) s.appendChild(el("option", { text: sc.title, attrs: { value: sc.scenario_id } }));
+    $("runCheck").disabled = checkPending || scenarios.length === 0;
+    if (!scenRes.ok) $("checkStatus").textContent = "Could not load scenarios: " + detailOf(scenRes);
+  }
+
+  function renderCard(card, text) {
+    const ts = card.ended_at || card.timestamp || null;
+    const head = kv([
+      ["Verdict", verdictEl(card.verdict)],
+      ["Run id", card.run_id],
+      ["Timestamp", ts],
+      ["Incomplete cause", card.incomplete_cause ? card.incomplete_cause + (card.cause_detail ? " (" + card.cause_detail + ")" : "") : "none"],
+      ["Pass rate", typeof card.pass_rate === "number" ? Math.round(card.pass_rate * 100) + "% of " + card.scenarios_run + " scenarios" : "n/a"],
+      ["TTFA p50 / p95", fmtMs(card.ttfa_p50_ms) + " / " + fmtMs(card.ttfa_p95_ms) + " (n=" + (card.ttfa_n || 0) + ")" + (card.ttfa_label ? " — " + card.ttfa_label : "")],
+      ["Barge-in p50 / tail", fmtMs(card.bargein_p50_ms) + " / " + fmtMs(card.bargein_tail_ms) + (card.bargein_tail_kind ? " (" + card.bargein_tail_kind + ")" : "")],
+      ["IHBench", card.ihbench_rq ? fmtNum(card.ihbench_rq.rq_pass_rate * 100, 1) + "% (" + card.ihbench_rq.label + ")" : "not available"],
+      ["Audio in / out", fmtNum(card.input_audio_minutes, 2) + " / " + fmtNum(card.output_audio_minutes, 2) + " min"],
+      ["Est. audio cost", typeof card.estimated_audio_cost_usd === "number" ? "$" + card.estimated_audio_cost_usd.toFixed(4) + (card.estimated_audio_cost_label ? " (" + card.estimated_audio_cost_label + ")" : "") : "n/a"],
+    ]);
+    const table = el("table", null, [el("thead", null, [el("tr", null, [el("th", { text: "Scenario" }), el("th", { text: "Label" })])])]);
+    const tbody = el("tbody");
+    for (const s of (card.scenarios || [])) {
+      const tdL = el("td");
+      tdL.appendChild(labelEl(s.judgment ? s.judgment.label : null));
+      tbody.appendChild(el("tr", null, [el("td", { text: s.title || s.scenario_id }), tdL]));
+    }
+    table.appendChild(tbody);
+    const nodes = [head, el("h3", { text: "Scenarios", attrs: { style: "margin-top:12px" } }), table];
+    if (typeof text === "string" && text) {
+      nodes.push(el("details", { attrs: { open: "" } }, [el("summary", { text: "Eval Card (text)" }), el("pre", { text })]));
+    }
+    $("card").replaceChildren(...nodes);
+  }
+
+  async function runCheck() {
+    if (!selected || checkPending) return;
+    const sel = selected;
+    const sid = $("scenarioSel").value;
+    const sc = scenarios.find((x) => x.scenario_id === sid);
+    if (!sc) return;
+    checkPending = true;
+    $("runCheck").disabled = true;
+    $("checkResult").hidden = true;
+    $("checkStatus").textContent = "Running: " + sc.title;
+    let res;
+    try {
+      res = await getJson("/api/agents/" + encodeURIComponent(sel.agentId) + "/scenarios/" + encodeURIComponent(sid) + "/check", { method: "POST" });
+    } catch (e) {
+      res = { ok: false, status: 0, body: { detail: e.message } };
+    }
+    checkPending = false;
+    $("runCheck").disabled = scenarios.length === 0;
+    if (selected !== sel) return;
+    if (!res.ok || !res.body) {
+      $("checkStatus").textContent = "Scenario check failed: " + detailOf(res);
+      return;
+    }
+    $("checkStatus").textContent = "Finished: " + sc.title;
+    const r = res.body;
+    $("checkResult").replaceChildren(
+      el("span", { cls: "marker", text: r.marker || "single-scenario check" }),
+      kv([
+        ["Scenario", sc.title],
+        ["Label", labelEl(r.label)],
+        ["Rationale", r.rationale],
+        ["Evidence", r.evidence],
+        ["TTFA", fmtMs(r.ttfa_ms)],
+        ["Stored verdict (unchanged)", verdictEl(r.stored_verdict)],
+      ]),
+    );
+    $("checkResult").hidden = false;
+  }
+
+  // ---------- 3: live session ----------
+  const TARGET_RATE = 24000;
+  const FRAME_SAMPLES = 960; // 40 ms at 24 kHz
+  const WORKLET_SRC = `
+class Pcm16Sender extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    this.inRate = (options && options.processorOptions && options.processorOptions.inRate) || sampleRate;
+    this.outRate = 24000;
+    this.frame = 960;
+    this.step = this.inRate / this.outRate;
+    this.resample = Math.abs(this.step - 1) > 1e-9;
+    this.prev = 0;
+    this.t = 0;
+    this.buf = new Int16Array(this.frame);
+    this.n = 0;
+  }
+  push(s) {
+    s = s < -1 ? -1 : (s > 1 ? 1 : s);
+    this.buf[this.n++] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    if (this.n === this.frame) {
+      const b = this.buf.buffer;
+      this.port.postMessage(b, [b]);
+      this.buf = new Int16Array(this.frame);
+      this.n = 0;
+    }
+  }
+  process(inputs) {
+    const input = inputs[0];
+    const ch = input && input[0];
+    if (!ch) return true;
+    if (!this.resample) {
+      for (let i = 0; i < ch.length; i++) this.push(ch[i]);
+      return true;
+    }
+    // Linear resampling. Coordinates: x[0] = previous block's last sample, x[k] = ch[k-1].
+    const len = ch.length;
+    let t = this.t;
+    while (t + 1 <= len) {
+      const i = Math.floor(t);
+      const f = t - i;
+      const a = i === 0 ? this.prev : ch[i - 1];
+      const b = ch[i];
+      this.push(a + (b - a) * f);
+      t += this.step;
+    }
+    this.t = t - len;
+    this.prev = ch[len - 1];
+    return true;
+  }
+}
+registerProcessor("pcm16-sender", Pcm16Sender);
+`;
+
+  function setLiveStatus(text, isErr) {
+    $("liveStatus").textContent = text;
+    $("liveStatus").className = "status" + (isErr ? " err" : "");
+  }
+
+  function micErrorText(e) {
+    switch (e && e.name) {
+      case "NotAllowedError": return "Microphone permission was denied. Allow the microphone and press Start again.";
+      case "NotFoundError": return "No microphone was found.";
+      case "NotReadableError": return "The microphone is in use by another application or cannot be read.";
+      default: return "Could not open the microphone: " + ((e && e.message) || String(e));
+    }
+  }
+
+  function stopAllPlayback() {
+    if (!live) return;
+    for (const src of live.sources) {
+      try { src.onended = null; src.stop(); } catch (_) { /* already stopped */ }
+    }
+    live.sources.clear();
+    live.playhead = 0;
+    live.carry = null;
+  }
+
+  function playPcm(buf) {
+    if (!live || !live.ctx || live.ctx.state === "closed") return;
+    let bytes = new Uint8Array(buf);
+    if (live.carry) {
+      const merged = new Uint8Array(live.carry.length + bytes.length);
+      merged.set(live.carry, 0);
+      merged.set(bytes, live.carry.length);
+      bytes = merged;
+      live.carry = null;
+    }
+    if (bytes.length % 2 === 1) {
+      live.carry = bytes.slice(bytes.length - 1);
+      bytes = bytes.subarray(0, bytes.length - 1);
+    }
+    const n = bytes.length / 2;
+    if (n === 0) return;
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+    const ctx = live.ctx;
+    const ab = ctx.createBuffer(1, n, TARGET_RATE);
+    const data = ab.getChannelData(0);
+    for (let i = 0; i < n; i++) data[i] = dv.getInt16(i * 2, true) / 0x8000;
+    const src = ctx.createBufferSource();
+    src.buffer = ab;
+    src.connect(ctx.destination);
+    const startAt = Math.max(live.playhead, ctx.currentTime + 0.05);
+    src.start(startAt);
+    live.playhead = startAt + ab.duration;
+    live.sources.add(src);
+    src.onended = () => { if (live) live.sources.delete(src); };
+  }
+
+  function addTtfa(ms, label) {
+    if (label) $("ttfaLabel").textContent = "Measured from: " + label;
+    $("ttfaList").appendChild(el("li", { text: fmtMs(ms) }));
+  }
+
+  function addTranscript(text) {
+    const box = $("transcript");
+    box.appendChild(el("p", { text }));
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function startTimer() {
+    live.startedAt = performance.now();
+    const tick = () => {
+      if (!live || !live.startedAt) return;
+      const el_s = (performance.now() - live.startedAt) / 1000;
+      $("timer").textContent = fmtClock(el_s) + " / " + (live.limitS ? fmtClock(live.limitS) : "--:--");
+    };
+    tick();
+    live.timerId = setInterval(tick, 250);
+  }
+
+  function startMeter() {
+    const an = live.analyser;
+    const arr = new Float32Array(an.fftSize);
+    const loop = () => {
+      if (!live || !live.analyser) { $("meterBar").style.width = "0%"; return; }
+      an.getFloatTimeDomainData(arr);
+      let sum = 0;
+      for (let i = 0; i < arr.length; i++) sum += arr[i] * arr[i];
+      const rms = Math.sqrt(sum / arr.length);
+      $("meterBar").style.width = Math.min(100, Math.round(rms * 400)) + "%";
+      live.rafId = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+
+  async function startLive() {
+    if (live || !selected) return;
+    // AudioContext first, inside the click (user gesture), before any await.
+    let ctx;
+    try {
+      ctx = new AudioContext({ sampleRate: TARGET_RATE });
+    } catch (e) {
+      try { ctx = new AudioContext(); } catch (e2) { setLiveStatus("This browser cannot create an audio context.", true); return; }
+    }
+    const resumeP = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+    const sel = selected;
+    live = {
+      ctx, sel, ws: null, stream: null, node: null, analyser: null, mute: null,
+      sources: new Set(), playhead: 0, carry: null, ready: false, ended: false,
+      limitS: 0, startedAt: 0, timerId: 0, rafId: 0, quotaRefused: false,
+    };
+    $("startBtn").disabled = true;
+    $("stopBtn").disabled = false;
+    setTemplatesLocked(true);
+    $("ttfaList").replaceChildren();
+    $("ttfaLabel").textContent = "";
+    $("transcript").replaceChildren();
+    $("notReleased").hidden = true;
+    setLiveStatus("Opening the microphone…");
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      teardown("The microphone needs a secure page: open it at http://localhost or 127.0.0.1.", true);
+      return;
+    }
+    let stream;
+    try {
+      await resumeP;
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+    } catch (e) {
+      teardown(micErrorText(e), true);
+      return;
+    }
+    if (!live || live.ctx !== ctx) { stream.getTracks().forEach((t) => t.stop()); return; }
+    live.stream = stream;
+
+    try {
+      const url = URL.createObjectURL(new Blob([WORKLET_SRC], { type: "application/javascript" }));
+      try { await ctx.audioWorklet.addModule(url); } finally { URL.revokeObjectURL(url); }
+    } catch (e) {
+      teardown("Could not load the audio worklet: " + e.message, true);
+      return;
+    }
+    if (!live || live.ctx !== ctx) return;
+    const source = ctx.createMediaStreamSource(stream);
+    const node = new AudioWorkletNode(ctx, "pcm16-sender", { processorOptions: { inRate: ctx.sampleRate } });
+    const mute = ctx.createGain();
+    mute.gain.value = 0;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(node);
+    source.connect(analyser);
+    node.connect(mute);
+    mute.connect(ctx.destination); // zero gain: keeps the worklet pulled, mic never reaches speakers
+    live.node = node; live.mute = mute; live.analyser = analyser;
+    startMeter();
+
+    setLiveStatus("Connecting to the agent…");
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(proto + "//" + location.host + "/ws/live/" + encodeURIComponent(sel.agentId));
+    ws.binaryType = "arraybuffer";
+    live.ws = ws;
+    node.port.onmessage = (e) => {
+      // Mic frames go out only after "ready": the Boson session is open by then.
+      if (live && live.ws === ws && live.ready && !live.ended && ws.readyState === WebSocket.OPEN && ws.bufferedAmount < 64000) {
+        ws.send(e.data);
+      }
+    };
+    ws.onmessage = (e) => onWsMessage(ws, e);
+    ws.onerror = () => { /* onclose follows and reports */ };
+    ws.onclose = (e) => onWsClose(ws, e);
+  }
+
+  function onWsMessage(ws, e) {
+    if (!live || live.ws !== ws) return;
+    if (typeof e.data !== "string") { playPcm(e.data); return; }
+    let m;
+    try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (!m || typeof m.type !== "string") return;
+    switch (m.type) {
+      case "ready": {
+        live.ready = true;
+        live.limitS = typeof m.limit_s === "number" ? m.limit_s : 0;
+        // AC-36: stays visible until this session ends; nothing else hides it.
+        $("notReleased").hidden = m.released !== false;
+        if (m.released === false) {
+          $("notReleased").textContent = "NOT RELEASED: latest gate verdict is " +
+            (m.verdict ? String(m.verdict).toUpperCase() : "NONE (no gate run yet)") +
+            (m.run_id ? " (run " + m.run_id + ")" : "") + ".";
+        }
+        startTimer();
+        setLiveStatus("Live. Speak now.");
+        break;
+      }
+      case "speech_started":
+      case "clear":
+        stopAllPlayback(); // AC-42
+        setLiveStatus("Listening…");
+        break;
+      case "ttfa":
+        addTtfa(m.ms, m.label);
+        setLiveStatus("Agent speaking. Talk over it to interrupt.");
+        break;
+      case "transcript":
+        if (typeof m.text === "string" && m.text) addTranscript(m.text);
+        break;
+      case "ended":
+        handleEnded(m.reason, m.message);
+        break;
+      default:
+        break;
+    }
+  }
+
+  function handleEnded(reason, message) {
+    if (!live || live.ended) return;
+    live.ended = true;
+    const msg = typeof message === "string" && message ? " " + message : "";
+    let text;
+    let err = false;
+    switch (reason) {
+      case "quota refused":
+        live.quotaRefused = true;
+        text = "The API quota was refused. The page will not reconnect; press Start to try again later.";
+        err = true;
+        break;
+      case "inactivity":
+        text = "The session ended for inactivity. Press Start to begin a new one.";
+        break;
+      case "limit reached":
+        text = "The session reached its time limit. Press Start to begin a new one.";
+        break;
+      case "error":
+        text = "The session ended with an error." + msg;
+        err = true;
+        break;
+      default:
+        text = "The session ended." + msg;
+    }
+    teardown(text, err);
+  }
+
+  function onWsClose(ws, e) {
+    if (!live || live.ws !== ws) return;
+    if (!live.ended) {
+      live.ended = true;
+      if (e.code === 4429) {
+        teardown("The API quota was refused. The page will not reconnect; press Start to try again later.", true);
+      } else {
+        teardown("The connection closed" + (e.code && e.code !== 1000 ? " (code " + e.code + ")" : "") + ". Press Start to begin a new one.", e.code !== 1000 && e.code !== 1005);
+      }
+      return;
+    }
+    teardown(null, false);
+  }
+
+  function stopLive() {
+    if (!live) return;
+    const ws = live.ws;
+    live.ended = true;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ type: "stop" })); } catch (_) { /* closing anyway */ }
+    }
+    teardown("Session stopped. Press Start to begin a new one.", false);
+  }
+
+  // Releases everything. Never reconnects (AC-44): a new session needs a Start click.
+  function teardown(text, isErr) {
+    if (!live) { if (text) setLiveStatus(text, isErr); return; }
+    const l = live;
+    stopAllPlayback();
+    live = null;
+    if (l.timerId) clearInterval(l.timerId);
+    if (l.rafId) cancelAnimationFrame(l.rafId);
+    $("meterBar").style.width = "0%";
+    if (l.node) { try { l.node.port.onmessage = null; l.node.disconnect(); } catch (_) { /* gone */ } }
+    if (l.stream) l.stream.getTracks().forEach((t) => t.stop());
+    if (l.ws) {
+      l.ws.onmessage = null;
+      l.ws.onclose = null;
+      if (l.ws.readyState === WebSocket.OPEN || l.ws.readyState === WebSocket.CONNECTING) {
+        try { l.ws.close(1000); } catch (_) { /* gone */ }
+      }
+    }
+    if (l.ctx && l.ctx.state !== "closed") l.ctx.close().catch(() => {});
+    $("notReleased").hidden = true;
+    $("stopBtn").disabled = true;
+    $("startBtn").disabled = !selected;
+    setTemplatesLocked(false);
+    if (text) setLiveStatus(text, isErr);
+  }
+
+  function setTemplatesLocked(locked) {
+    for (const b of $("templates").children) if (b.tagName === "BUTTON") b.disabled = locked;
+  }
+
+  $("runCheck").addEventListener("click", runCheck);
+  $("startBtn").addEventListener("click", startLive);
+  $("stopBtn").addEventListener("click", stopLive);
+  window.addEventListener("pagehide", () => { if (live) stopLive(); });
+  loadTemplates();
+})();
+</script>
+</body>
+</html>

@@ -128,7 +128,10 @@ def test_realtime_smoke() -> None:
     findings = asyncio.run(run_smoke())
     assert findings["event_before_session_update"] is None  # F1
     assert "session.created" in findings["first_events_after_session_update"]  # F1
-    assert findings["response_done_usage"] is None  # F2
+    # F2 (wire observation, 2026-10-24): the wire disagrees with the docs, `usage` is populated.
+    assert isinstance(findings["response_done_usage"], dict), (
+        f"F2: response.done must carry a usage object, got {findings['response_done_usage']!r}"
+    )
     assert findings["response_done_status_details"] is None  # F2
     assert findings["conversation_item_done_seen"] is False  # F5
 
