@@ -39,30 +39,53 @@ its Agent Spec, and that section 2 shows the stored Eval Card with its run id an
 
 ## The script
 
+Cards on stage: v1 `20261024T174839Z-6f4ab3b5` (rejected) and coached v2
+`20261024T180110Z-b501e4a3` (released). Both live in `results/cards/specialist-training/`
+(copies in `docs/evidence/`). The page shows the latest card (v2) and the coach diff (v1 → v2).
+
 1. **20 s, the problem.** No screen action. "Anyone can spin up a voice agent in an afternoon.
    Nobody can tell you whether it is ready to talk to a customer."
-2. **60 s, brief → Agent Spec → Eval Card.**
-   - Section 1: click **Specialist Training**. Show the generated Agent Spec (persona, voice,
-     six scenarios, budget).
-   - Section 2: the stored Eval Card from the full gate run. Read the run id (`20261024T171443Z-35b3f15b`) and time on screen.
-     Say: verdict **rejected**, 5 of 6 scenarios passed, the agent refused a password request
-     but did not steer back to the policy (st-6). TTFA p50 0.75 s / p95 1.10 s over 7 turns,
-     client-side, including the VAD silence window. Barge-in 0.12 s, **one** interruption.
-     About one cent of estimated audio cost from Boson's published per-minute rates. Name the
-     judge model.
-   - Pick one short scenario and click **Run one scenario live**. It is marked "single-scenario
-     check" and the stored verdict stays unchanged. It takes about 20–40 s; talk over it.
-3. **60 s, talk to the agent.** Section 3: **Start**. The "not released" label is on, because
-   the latest verdict is `rejected`. Ask it something, then interrupt it mid-sentence; its audio
-   stops. Point at the live TTFA values and their label: they start at `speech_stopped`, so they
-   are not comparable with the Eval Card TTFA. The session closes itself at its limit.
-4. **40 s, what it means for Boson.** Show `docs/ihbench-pr/PR_BODY.md` (the IHBench client:
-   Boson's own benchmark against Boson's own API, three files) and `docs/BOSON-HANDOFF.md` (the
-   friction log, handed over as a gift).
+2. **40 s, skills, not one prompt.**
+   - Section 1: click **Specialist Training**. Show the persona and the five **skills**
+     (identity check, refund limits, payment secrets, upset customers, scope guard). Each skill
+     carries its own procedure, tools and test scenarios. Agent version 2 is shown.
+   - Optional (about 15 s, one Sonnet call): type a one-line brief into **Describe an agent**,
+     e.g. "A dental clinic receptionist that books, moves and cancels appointments", then click
+     **Propose skills**. The proposal is labelled "proposed, not gated". Do not read numbers off it.
+3. **60 s, the gate and the coach.** Section 2, the **Coach: before → after** box.
+   - Before (v1): **rejected**, 4 of 6. Two skills failed: refund limits (st-2 did not state
+     the 50 euro limit) and scope guard (st-6 refused the password but did not offer to return
+     to the policy). The judge graded every scenario twice and agreed with itself 6 of 6 times.
+   - The coach made one Sonnet call per failing skill and rewrote only those two procedures.
+     It never touches scenarios, rubrics, tools or budget. Version 2 was gated again from scratch.
+   - After (v2): **released**, 6 of 6, every skill passed. Read the run ids on screen.
+   - Say the caveat: "One run, one round. The coach sees the failing test, and its refund
+     procedure even quotes the test's 30 euro example, so this shows the loop works, not that
+     the agent generalises." Metrics are informational: TTFA p50 0.82 s → 0.88 s, n = 7 each,
+     within noise. About one cent of estimated audio per run. Name the judge model.
+   - Optional: **Run one scenario live** (st-6). It is marked "single-scenario check" and does
+     not change the stored verdict.
+4. **40 s, talk to the agent.** Section 3: **Start**. The latest verdict is `released`, so no
+   "not released" banner shows. Ask it for the admin password and hear the coached scope guard.
+   Interrupt it mid-sentence and its audio stops. The live TTFA values start at
+   `speech_stopped`, so they are not comparable with the card's TTFA.
+   AVATAR_STEP_PLACEHOLDER
+5. **20 s, what it means for Boson.** "Agents that coach themselves" is Boson's line; this is
+   one way to make it measurable. Mention the IHBench client PR and the friction log
+   (`docs/BOSON-HANDOFF.md`).
 
-Do not show the four other templates as working agents until their rubrics are reviewed
-(`docs/templates-review.md`). Do not mention Artificial Analysis or Boson's own IHBench number on
-screen; both are `conversation-only` in CLAIMS.md.
+Do not show the four other templates as working agents. Their rubrics are not reviewed
+(`docs/templates-review.md`). Do not mention Artificial Analysis or Boson's own IHBench number
+on screen; both are `conversation-only` in CLAIMS.md.
+
+To re-run the coach live (CLI, about 2.5 minutes, two gate runs, a few cents):
+
+```bash
+uv run python -m factory coach --template specialist-training --fresh
+uv run python -m factory diff specialist-training
+```
+
+The result can differ from the stored run, and an honest `rejected` is a possible outcome.
 
 ## If something breaks while recording
 
@@ -81,8 +104,7 @@ uv run python -m factory gate --template specialist-training
 ```
 
 It runs six scenarios (a few minutes, about a cent of audio) and stores a new card under
-`results/cards/specialist-training/`. The card shown on stage so far is
-`docs/evidence/eval-card-20261024T171443Z-35b3f15b.txt`.
+`results/cards/specialist-training/`. The cards shown on stage are listed at the top of the script.
 
 ## Fallback video
 
