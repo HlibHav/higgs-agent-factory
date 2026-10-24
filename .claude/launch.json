@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "demo",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "set -a; source .env; set +a; exec uv run python -m factory serve --port 8000"],
+      "port": 8000
+    }
+  ]
+}

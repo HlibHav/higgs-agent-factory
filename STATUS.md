@@ -1,29 +1,32 @@
 # Status
 
-Last refreshed: 2026-10-24T16:45:00Z by setup session (Claude Code) — verified by: `uv run python -m factory gate --template specialist-training` → `Verdict: rejected`, `Scenarios run: 6, pass rate: 83%` (run `20261024T164057Z-9e2ee667`)
+Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch `chore/finalize-hackathon` — verified by: `uv run pytest -m "not live" -q` → `238 passed, 1 deselected`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `83 files already formatted`; `uv run mypy` → `Success: no issues found in 30 source files`.
 
 ## Works now
 
-- Offline gate on `feat/agent-factory-p1`: `uv run pytest -m "not live" -p no:logging` → `179 passed, 1 deselected, 4 xfailed`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `67 files already formatted`.
-- P1 live gate, Specialist Training: `uv run python -m factory gate --template specialist-training` (keys in env) → `rejected`, 5/6 PASS, st-6 PARTIAL; TTFA p50 853 ms / p95 1,164 ms (n = 7); barge-in 272 ms (n = 1); one response per turn; estimated audio $0.0116; tokens 2,071 in / 1,840 cached / 155 out. Card copied to `docs/evidence/eval-card-20261024T164057Z-9e2ee667.{json,txt}`.
-- Scenario isolation and turn end (AC-55…61): each scenario has its own session; a turn ends after 2 s with no new response; `Responses per turn` is on the card.
-- Judge-invalid diagnostics (AC-62…64): an invalid judge reply is kept (≤ 2,000 chars, truncated flag) with the transcript length, in the record and stored card; never rendered.
-- P0 IHBench client (fork `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs`): `50 passed` on websockets 17.3 and 12.0; AC-26 footprint = 3 files; live AC-14 replay order MATCH; live smoke `Done. 10 responses saved to responses/higgs-realtime.jsonl, 0 failures.` Internal draft PR: https://github.com/HlibHav/ihbench/pull/1.
-- Repo is public: https://github.com/HlibHav/higgs-agent-factory (`main` + `feat/agent-factory-p1`).
-- Protocol facts F1–F27 in `docs/boson-protocol.md`; live-verified: F1, F5, F14, F18, F23, F24, F25, F26, F27; F2 is "docs and wire disagree" (usage is reported, audio mode included).
+- P1 live gate, Specialist Training: `uv run python -m factory gate --template specialist-training` → run `20261024T164057Z-9e2ee667`, `rejected`, 5/6 PASS (st-6 PARTIAL); TTFA p50 853 ms / p95 1,164 ms (n = 7); barge-in 272 ms (n = 1); estimated audio $0.0116. Card: `docs/evidence/eval-card-20261024T164057Z-9e2ee667.{json,txt}`.
+- P2 demo page: `uv run python -m factory serve --port 8000` (keys from env, 127.0.0.1 only). Checked in the browser: five template cards, Agent Spec on click, stored Eval Card with run id and timestamp, single-scenario check live (st-1 → PASS, TTFA 740 ms, marked "single-scenario check", stored verdict still REJECTED). Live session checked through `/ws/live/specialist-training` with a scripted client and cached TTS audio: `ready` with `released: false`, assistant audio and transcript returned, live TTFA 499 ms from `speech_stopped`. Not checked by an agent: a real microphone in the browser and barge-in playback stop (AC-42) — Glib checks this with headphones before recording.
+- Four more templates (Health Insurance, Fraud Detection, Customer Support, AI Receptionist): AC-3 green offline. Rubrics NOT reviewed by Glib (`docs/templates-review.md`); no live gate run.
+- Review loop closed for both plans: `docs/plans/*.state.md`, `docs/plans/*.verify.md`, spec Traceability tables filled. Fixed: AC-29 barge-in counted only for a cancelled response; env read moved to the composition root; IHBench client wraps sends in close handling and bounds the close handshake.
+- P0 IHBench client (fork): `feat/higgs-realtime-client` at `abd6bd9`, tests at `0d73f72`; `54 passed` on websockets 17.3 and 12.0; footprint 3 files; both branches pushed to HlibHav/ihbench (draft PR HlibHav/ihbench#1).
+- Protocol: F2 settled (input_tokens includes cached tokens, probe `docs/evidence/probe-usage-20261024T165857Z.json`); F28 new (a cancelled response ends with one `response.done`, status `cancelled`). `scripts/smoke.py` now asserts the wire (usage present).
+- Hand-off for Boson: `docs/BOSON-HANDOFF.md`. Demo runbook: `docs/DEMO-RUNBOOK.md`. Upstream PR body and command: `docs/ihbench-pr/` (not run).
 
 ## In progress
 
 - Nothing running.
 
-## Blocked
+## Blocked (Glib)
 
-- The PR to `boson-ai/ihbench` is opened only as the final step, on Glib's word. Until then: HlibHav/ihbench#1.
-- The repo's own `uv run pytest -m live scripts/smoke.py` is red by design: it asserts the documented `usage: null`, and the wire returns usage (F2). Glib to decide whether it should assert the docs or the wire.
+- Record the demo (`docs/DEMO-RUNBOOK.md`).
+- "Push to Boson": `I_AM_GLIB_AND_SAID_PUSH_TO_BOSON=yes bash docs/ihbench-pr/create-pr.sh`.
+- Review the four template rubrics before any of them is shown.
+- Architecture finding A1: `factory/composition.py` imports `anthropic`/`httpx`, outside the plan's SDK allow-list.
+- IHBench finding 3: on websockets 12–13 a cross-host redirect would resend the bearer header.
+- Merge `chore/finalize-hackathon` into `main`.
 
 ## Next
 
-- `judge reply invalid` on st-1 happened in 2 of 7 live runs and has not reproduced since; the next occurrence leaves the raw reply in the stored card (AC-62) — read it and record the cause.
-- P2 demo page (plan steps 25–28) if wanted; L5 avatar is unplanned.
-- Merge `feat/agent-factory-p1` into `main` after review; P0 final PR to Boson when Glib says we're done.
-- Measured token dollar cost (plan step 21b) waits on whether `input_tokens` includes cached tokens (F2).
+- Token dollar cost (plan steps 21b/21c, AC-50/51) is unblocked by the F2 probe; not built.
+- `judge reply invalid` on st-1 (2 of 7 earlier runs) did not recur today; the raw reply is kept in the card when it does (AC-62).
+- Review "should" findings left open: `docs/plans/2026-10-24-higgs-agent-factory.verify.md` (S1–S4, C2–C5).
