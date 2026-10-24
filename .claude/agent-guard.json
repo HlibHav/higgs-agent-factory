@@ -3,6 +3,7 @@
     "uv run pytest -m \"not live\"",
     "uv run ruff check",
     "uv run ruff format --check",
-    "/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py"
+    "/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py",
+    "/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv-ws12/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py"
   ]
 }

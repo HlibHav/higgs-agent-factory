@@ -59,6 +59,7 @@ Secrets come from `.env` (template: `.env.example`). Never print a key; check pr
 | Lint | `uv run ruff check` | none |
 | Format | `uv run ruff format --check` | none |
 | IHBench client offline tests (fork, test branch) | `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py` | none |
+| IHBench client offline tests on websockets 12.0 (AC-38) | `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv-ws12/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py` | none |
 | IHBench PR footprint (AC-26, main session only: the guard denies `git -C`) | `git -C /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs diff --name-only upstream/main...feat/higgs-realtime-client` | none, not in guard |
 | Live smoke | `uv run pytest -m live scripts/smoke.py` | Boson API, spends credits |
 
