@@ -534,7 +534,8 @@ class _Run:
                     if interrupted is not None and play_task is not None:
                         reply.interrupt_last_chunk_t = await play_task
                         mark = self.session.first_send_t
-                        if mark is not None and last_delta_t > mark:
+                        # AC-29: only a cancelled response counts as stopped by the interruption
+                        if event.status == "cancelled" and mark is not None and last_delta_t > mark:
                             reply.bargein_ms = (last_delta_t - mark) * 1000.0
                         break
                     if not follow_up:

@@ -583,3 +583,39 @@ def test_ac61_responses_per_turn_recorded_and_shown(tmp_path: Path) -> None:
     text = render_card_text(card)
     assert "responses per turn" in text.lower()
     assert "s1 turn 1 = 2 (split)" in text and "s1 turn 2 = 1" in text
+
+
+# --- barge-in measurement (AC-28, AC-29) ----------------------------------------------------
+
+
+def _bargein_turns(script: list, tmp_path: Path) -> list:
+    raw = make_spec()
+    raw["scenarios"][0]["user_turns"] = [
+        {"text": "Tell me a story."},
+        {"text": "Stop.", "interrupt_after_assistant_ms": 100},
+    ]
+    record = Harness(tmp_path, raw, script, [GOOD]).run()
+    return [(t.turn_index, t.bargein_ms, t.bargein_status) for t in record.turns]
+
+
+def _interrupted_reply(status: str) -> list:
+    return [
+        AudioDelta("A", 4800, 1000.4),
+        TranscriptDelta("A", "Once upon", 1000.4),
+        AudioDelta("A", 4800, 1000.5),
+        ResponseDone("A", status, None, 1000.6),
+        AudioDelta("B", 4800, 1001.5),
+        TranscriptDelta("B", "Sure.", 1001.5),
+        ResponseDone("B", "completed", None, 1001.6),
+    ]
+
+
+def test_ac29_cancelled_interruption_is_measured(tmp_path: Path) -> None:
+    turns = _bargein_turns(_interrupted_reply("cancelled"), tmp_path)
+    assert turns[1][2] == "measured"
+    assert turns[1][1] is not None
+
+
+def test_ac29_completed_interruption_is_not_measured(tmp_path: Path) -> None:
+    turns = _bargein_turns(_interrupted_reply("completed"), tmp_path)
+    assert turns[1][1:] == (None, "not measured")
