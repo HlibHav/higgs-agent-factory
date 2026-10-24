@@ -98,6 +98,13 @@ means a run against the live Boson API (the `live` marker, spends credits).
 - AC-14 IF the Boson session closes with code 4429 after an `insufficient_quota` error (F13) during a gate run, THEN the system shall set the verdict to `incomplete` with cause "quota refused" and shall not set `released`. — proof: red-first integration — verify: fake Realtime server sends the F13 error and closes with 4429 mid-scenario; expect `incomplete`, cause "quota refused"
 - AC-15 IF the server sends `session.idle_timeout` (F8) during a gate run, THEN the system shall set the verdict to `incomplete` with cause "idle timeout". — proof: red-first integration — verify: fake server sends `session.idle_timeout` and closes; expect `incomplete`, cause "idle timeout"
 - AC-16 IF the Boson session closes with code 1013 (F21) during a gate run, THEN the system shall set the verdict to `incomplete` with cause "concurrency limit". — proof: red-first integration — verify: fake server closes with 1013; expect `incomplete`, cause "concurrency limit"
+- AC-55 WHEN a gate run starts a scenario, the system shall open a new Realtime session for that scenario alone, so that no other scenario's history, events, transcript or audio reaches it. — proof: red-first integration — verify: run three scenarios against a fake server that logs sessions; expect three sessions, each receiving only its own scenario's turns, and each judge request containing only its own scenario's transcript
+- AC-56 The system shall sum the measured audio of all scenario sessions of a gate run against the per-run audio limit. — proof: red-first integration — verify: per-run limit 10 s, three scenarios of about 4 s audio each; expect the run to stop during the third scenario with `incomplete`, cause "budget reached"
+- AC-57 WHEN a response of a user turn ends (`response.done`, F17), the system shall treat the turn's reply as finished only after 2 s pass with no new response started. — proof: red-first integration — verify: fake server ends response A, starts response B 1.2 s later and ends it; expect the next scripted turn to start no earlier than 2 s after B's `response.done`, and not after A's
+- AC-58 WHEN more than one response starts within a user turn's quiet window, the system shall join their transcripts in order as that turn's reply and send all of them to the judge. — proof: red-first integration — verify: replay the st-5 split ("No problem." then the real answer 1 s later); expect the judge request for st-5 to hold both texts in order, and neither text in any other scenario's judge request
+- AC-59 The system shall measure a user turn's TTFA on the first response of that turn only. — proof: red-first unit — verify: a turn with two responses whose first audio deltas arrive at 400 ms and 1,600 ms; expect one TTFA record of 400 ms for that turn
+- AC-60 The system shall count streamed silence sent during a turn's quiet window toward the per-run audio limit. — proof: red-first integration — verify: a turn followed by a 2 s quiet window; expect the run's input audio minutes to include the 2 s of silence
+- AC-61 WHEN a user turn ends, the system shall record in the run record and on the Eval Card how many responses the turn produced. — proof: red-first unit — verify: a run with one split turn and one normal turn; expect counts 2 and 1 stored and shown for those turns
 - AC-17 IF the measured audio of a gate run (input plus output) reaches the Agent Spec's per-run audio limit before the last scenario ends, THEN the system shall stop the run and set the verdict to `incomplete` with cause "budget reached". — proof: red-first integration — verify: set the audio limit below one scenario's length; expect the run to stop at the limit with `incomplete`, cause "budget reached"
 - AC-18 IF the judge's reply does not carry exactly one of the labels PASS, PARTIAL or FAIL plus a rationale and an evidence quote, THEN the system shall set the verdict to `incomplete` with cause "judge reply invalid" and make no further judge call for that scenario. — proof: red-first unit — verify: judge double returns `{"label": "MAYBE"}`; expect `incomplete`, one judge call in total for that scenario
 - AC-19 The system shall decide the verdict from scenario labels and run completion only, so IHBench RQ, TTFA and barge-in stop time never change it. — proof: red-first unit — verify: same PASS labels with RQ 0% and TTFA p95 of 30 s; expect `released`
@@ -174,6 +181,9 @@ means a run against the live Boson API (the `live` marker, spends credits).
 | R-22 | Cost: estimated audio cost from F12 rates × measured minutes; token cost "not measurable (F2)"; nothing presented as billed | brief; Glib, cost framing | AC-30, AC-31, AC-32 |
 | R-30 | Measured token cost from reported usage × F12 token rates as the headline when every response reported usage; audio estimate kept as a separate line | Glib, 2026-10-24 after live smoke (F2 wire observation) | AC-50, AC-51, AC-31 |
 | R-31 | Demo step 2: full Eval Card from a prior run (run id, time) plus one scenario run live | Glib, 2026-10-24 | AC-52, AC-53 |
+| R-32 | Scenario isolation: one Realtime session per scenario; budget sums across them | main session under Glib's direction, after gate run `20261024T161045Z-d663176a` | AC-55, AC-56 |
+| R-33 | Turn end after a 2 s quiet window; all responses in the window form the turn's reply; TTFA on the first; window silence counts toward budget | Glib ("2 с"), same run | AC-57, AC-58, AC-59, AC-60 |
+| R-34 | Responses per turn recorded, so a split turn is visible | main session, same run | AC-61 |
 | R-23 | Eval Card contract (agent id, run id, timestamp, pass rate, RQ, TTFA, barge-in, cost, verdict) | brief | AC-33, AC-27, AC-30, AC-34 |
 | R-24 | Every number traces to a measurement or source | brief §0.4; `docs/CLAIMS.md` | AC-33 |
 | R-25 | Live talk with a non-released agent is allowed but visibly labelled "not released" | Glib, 2026-10-24 (AC-36 answer) | AC-36 |
@@ -203,6 +213,8 @@ means a run against the live Boson API (the `live` marker, spends credits).
 | Agent not released, live session requested | allowed, "not released" label shown throughout | AC-36 |
 | Some responses report usage, others not (e.g. audio mode unobserved, F2) | token cost "not measurable (F2)", no token figure | AC-31 |
 | Single scenario run live passes for a `rejected` agent | shown as "single-scenario check", verdict unchanged | AC-53 |
+| Server VAD splits one scripted user turn with an internal pause into two turns and two responses (seen in run `20261024T161045Z-d663176a`, st-5; UNVERIFIED on the wire in `docs/boson-protocol.md`) | both responses start within the 2 s window, so they form one reply, both go to the judge, nothing leaks into the next scenario, and the turn shows 2 responses | AC-57, AC-58, AC-61, AC-55 |
+| A second response starts more than 2 s after the first ended | it is not part of that turn; it falls into the next turn or, at scenario end, is lost with the scenario's own session, never reaching another scenario | AC-57, AC-55 |
 | No IHBench result yet | RQ "not available" | AC-34 |
 | Two gate runs for the same agent | two cards, distinct run ids, nothing overwritten | AC-33 |
 | Assistant transcript cut or missing at barge-in (UNVERIFIED in `docs/boson-protocol.md`) | judge sees what was received; open question | Open questions |
@@ -229,14 +241,14 @@ flowchart TD
   val -- no --> errs[Return validation errors]
   val -- yes --> budget{Budget limits present?}
   budget -- no --> norun[Refuse gate run]
-  budget -- yes --> session[Open Realtime session]
+  budget -- yes --> session[Open fresh session for next scenario]
   session -- "voice refused F7" --> stop[Stop, show error, not released]
-  session -- ok --> scen[Run next scenario]
+  session -- ok --> scen[Run scenario, turn ends after 2 s quiet]
   scen -- "4429 / idle / 1013 / budget" --> inc[Verdict incomplete]
   scen --> judge[Judge scenario]
   judge -- invalid reply --> inc
   judge --> more{More scenarios?}
-  more -- yes --> scen
+  more -- yes --> session
   more -- no --> allpass{All PASS?}
   allpass -- yes --> rel[Verdict released]
   allpass -- no --> rej[Verdict rejected + failing lines]
@@ -384,7 +396,7 @@ Budget limits (Specialist Training values per AC-5):
 | max judge calls per scenario | 1 |
 | max live session length | 3 min |
 
-System-wide limit (not per agent): free-text brief ≤ 1,000 characters (AC-2).
+System-wide limits (not per agent): free-text brief ≤ 1,000 characters (AC-2); turn quiet window 2 s (AC-57). Each scenario runs in its own Realtime session (AC-55); the per-run limits above apply across all of a run's sessions (AC-56).
 
 ### Scenario judgment (judge reply)
 
@@ -416,6 +428,7 @@ Anything else is an invalid reply (AC-18).
 | verdict | `released`, `rejected` or `incomplete` | AC-12, AC-13, AC-14…AC-18 |
 | incomplete cause | quota refused, idle timeout, concurrency limit, budget reached, judge reply invalid, audio missing | AC-10, AC-14…AC-18 |
 | raw measurements | per-turn TTFA, barge-in, audio minutes | AC-33 |
+| responses per turn | number of responses each user turn produced (more than 1 marks a split turn) | AC-61 |
 
 ### Templates
 
@@ -455,7 +468,7 @@ Training is the P1 template and carries the AC-5 budget.
 
 - **L1 schema + generator:** Agent Spec contract, schema validation, templates, brief → spec. AC-1…AC-7, AC-46.
 - **L2 runtime on `pipecat-boson`** (the reuse decision in `docs/reuse-map.md`): session from an Agent Spec, mocked tools, server `web_search`, live session limit, event tolerance. AC-20…AC-22, AC-24, AC-26, AC-35.
-- **L3 eval runner + judge + Eval Card:** TTS cache, paced scenario playback, timing, judge, verdict, cost, card storage. AC-8…AC-19, AC-23, AC-25, AC-27…AC-34, AC-45, AC-47, AC-48, AC-50, AC-51, AC-54.
+- **L3 eval runner + judge + Eval Card:** TTS cache, paced scenario playback, timing, judge, verdict, cost, card storage. AC-8…AC-19, AC-23, AC-25, AC-27…AC-34, AC-45, AC-47, AC-48, AC-50, AC-51, AC-54, AC-55…AC-61.
 - **L4 demo page (P2):** AC-36…AC-44, AC-49, AC-52, AC-53.
 - **L5 avatar (P3):** F11; no ACs yet (non-goal of this draft).
 
@@ -534,6 +547,13 @@ Training is the P1 template and carries the AC-5 budget.
 | AC-52 | browser (main session) | gate step → stored full card with run id and timestamp | — | — | — |
 | AC-53 | red-first integration | stored `rejected` + one live PASS → "single-scenario check", verdict still `rejected` | — | — | — |
 | AC-54 | red-first unit | 200, 300, 900 ms + one "not measured" → p50 300, max 900, N = 3 | — | — | — |
+| AC-55 | red-first integration | 3 scenarios → 3 sessions, each with only its own turns and transcript | — | — | — |
+| AC-56 | red-first integration | limit 10 s, 3 × 4 s scenarios → `incomplete`, "budget reached" in the third | — | — | — |
+| AC-57 | red-first integration | A done, B starts 1.2 s later → next turn ≥ 2 s after B's done | — | — | — |
+| AC-58 | red-first integration | st-5 split replay → both texts in order in st-5's judge request only | — | — | — |
+| AC-59 | red-first unit | two responses at 400 / 1,600 ms → one TTFA of 400 ms | — | — | — |
+| AC-60 | red-first integration | 2 s quiet window → 2 s silence in input audio minutes | — | — | — |
+| AC-61 | red-first unit | split turn + normal turn → response counts 2 and 1 | — | — | — |
 
 ## Changelog
 
@@ -543,3 +563,4 @@ Training is the P1 template and carries the AC-5 budget.
 | 2026-10-24 | Cost: measured token cost (AC-50) is the headline when every response reported usage, audio estimate stays a separate line (AC-51); AC-31 now applies only when some response lacked usage; non-goal and NFR wording that called token cost never measurable removed. AC-36: live talk with a non-released agent allowed with a "not released" label. Demo step 2: stored full card plus one live scenario (AC-52, AC-53). Two markers closed, one added (cached-token counting). | Live smoke `results/smoke-20261024T145225Z.jsonl` showed `usage` populated on a text-mode `response.done` (F2 docs vs wire); Glib's answers on cost, AC-36 and demo timing. update mode |
 | 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word. |
 | 2026-10-24 | Barge-in aggregate on the Eval Card fixed as p50 and max with N, "not measured" turns excluded; AC-54 added; marker closed. Status left as approved. | Glib's answer: on 3–6 points p95 equals max but reads as statistics that are not there; max with N is more honest. update mode |
+| 2026-10-24 | Added AC-55…AC-61: one Realtime session per scenario with the run budget summed across sessions; a turn's reply ends after a 2 s quiet window, all responses in the window are joined for the judge, TTFA on the first, window silence counts toward budget; responses per turn recorded on the run and the card. Gate diagram, contracts, edge cases, coverage (R-32…R-34) and traceability updated. Status left as approved. | Spec described incomplete behaviour: live gate run `20261024T161045Z-d663176a` (rejected, 4/6) showed a VAD-split turn in st-5 whose real answer leaked into st-6, and shared history across scenarios. Glib's direction to do it properly; quiet window 2 s by Glib's answer. update mode |
