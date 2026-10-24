@@ -44,10 +44,10 @@ its Agent Spec, and that section 2 shows the stored Eval Card with its run id an
 2. **60 s, brief → Agent Spec → Eval Card.**
    - Section 1: click **Specialist Training**. Show the generated Agent Spec (persona, voice,
      six scenarios, budget).
-   - Section 2: the stored Eval Card from the full gate run. Read the run id and time on screen.
+   - Section 2: the stored Eval Card from the full gate run. Read the run id (`20261024T171443Z-35b3f15b`) and time on screen.
      Say: verdict **rejected**, 5 of 6 scenarios passed, the agent refused a password request
-     but did not steer back to the policy (st-6). TTFA p50 0.85 s / p95 1.16 s over 7 turns,
-     client-side, including the VAD silence window. Barge-in 0.27 s, **one** interruption.
+     but did not steer back to the policy (st-6). TTFA p50 0.75 s / p95 1.10 s over 7 turns,
+     client-side, including the VAD silence window. Barge-in 0.12 s, **one** interruption.
      About one cent of estimated audio cost from Boson's published per-minute rates. Name the
      judge model.
    - Pick one short scenario and click **Run one scenario live**. It is marked "single-scenario
@@ -82,7 +82,7 @@ uv run python -m factory gate --template specialist-training
 
 It runs six scenarios (a few minutes, about a cent of audio) and stores a new card under
 `results/cards/specialist-training/`. The card shown on stage so far is
-`docs/evidence/eval-card-20261024T164057Z-9e2ee667.txt`.
+`docs/evidence/eval-card-20261024T171443Z-35b3f15b.txt`.
 
 ## Fallback video
 
