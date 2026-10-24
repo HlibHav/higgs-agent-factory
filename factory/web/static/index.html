@@ -465,6 +465,8 @@
     }
     const verdict = (cardRes.ok && cardRes.body && cardRes.body.card) ? cardRes.body.card.verdict : null;
     $("runCoach").disabled = verdict !== "rejected";
+    $("runGate").disabled = false;
+    pollJob(); // re-disables both while a run is in progress
     $("runCoach").title = verdict === "rejected" ? "" : "The coach runs only on a rejected agent.";
     const s = $("scenarioSel");
     s.replaceChildren();
