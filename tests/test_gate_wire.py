@@ -227,3 +227,19 @@ def test_wire_one_connection_per_scenario(tmp_path: Path, monkeypatch: pytest.Mo
     assert len(card.scenarios) == 2
     stored = FileCardStore(tmp_path / "cards").latest("agent-1")
     assert stored is not None and len(stored.scenarios) == 2
+
+
+def test_cli_leaves_the_environment_read_to_the_composition_root(tmp_path: Path) -> None:
+    import factory.__main__ as entry
+
+    seen: list[object] = []
+
+    def factory_spy(env: object, results: Path) -> object:
+        seen.append(env)
+        raise ConfigError("stop")
+
+    main(
+        ["gate", "--template", "specialist-training"], results_dir=tmp_path, app_factory=factory_spy
+    )
+    assert seen == [None]
+    assert not hasattr(entry, "os")
