@@ -17,6 +17,7 @@ import secrets
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -30,12 +31,16 @@ from factory.agent_spec.templates import TEMPLATE_IDS, TemplateNotAvailable, loa
 from factory.agent_spec.validation import validate_agent_spec
 from factory.coach.coach import coach_spec
 from factory.coach.coach_anthropic import AnthropicCoachModel
+from factory.film.app import FilmApp
+from factory.film.browser_playwright import open_playwright_page
+from factory.film.ffmpeg import Ffmpeg
+from factory.film.server_http import HttpServer
 from factory.gate.card_builder import build_card
 from factory.gate.card_store import FileCardStore
 from factory.gate.judge_anthropic import AnthropicJudge
 from factory.gate.records import EvalCard
 from factory.gate.runner import GateAborted, GateRefused, preflight, run_gate
-from factory.gate.tts_boson import BosonTts
+from factory.gate.tts_boson import TTS_MODEL, BosonTts
 from factory.gate.tts_cache import TurnAudioSource
 from factory.live.session import LiveAudioDelta
 from factory.ports import (
@@ -427,4 +432,52 @@ def build_app(env: Mapping[str, str] | None, results_dir: Path) -> FactoryApp:
         brief_model=AnthropicBriefModel(llm, model_id=judge_model),
         coach_model=AnthropicCoachModel(llm, model_id=judge_model),
         _closers=(http.aclose, llm.close),
+    )
+
+
+class _LazyTts:
+    """`TtsPort` that reads the key and opens the HTTP client on the first synthesis, so the
+    film commands that never speak (timeline, run, render) run without BOSON_API_KEY."""
+
+    def __init__(self, env: Mapping[str, str]) -> None:
+        self._env = env
+        self._http: httpx.AsyncClient | None = None
+        self._tts: BosonTts | None = None
+
+    async def synthesise(self, text: str, voice: str) -> bytes:
+        if self._tts is None:
+            key = _required(self._env, "BOSON_API_KEY")  # ConfigError names the variable only
+            self._http = httpx.AsyncClient(base_url=BOSON_API_BASE_URL, timeout=TTS_TIMEOUT_S)
+            self._tts = BosonTts(self._http, key, TTS_MODEL)
+        return await self._tts.synthesise(text, voice)
+
+    async def aclose(self) -> None:
+        if self._http is not None:
+            await self._http.aclose()
+
+
+def build_film(env: Mapping[str, str] | None, out_dir: Path) -> FilmApp:
+    """The film recorder's services. Nothing is read or opened until a command needs it: the key
+    on the first synthesis, Chromium on the first page, the HTTP client per `run`."""
+    env = os.environ if env is None else env
+    tts = _LazyTts(env)
+    clients: list[httpx.AsyncClient] = []
+
+    def server_factory(base_url: str) -> HttpServer:
+        client = httpx.AsyncClient(base_url=base_url, timeout=10)
+        clients.append(client)
+        return HttpServer(client)
+
+    async def close_clients() -> None:
+        for client in clients:
+            await client.aclose()
+
+    return FilmApp(
+        tts=tts,
+        model=TTS_MODEL,
+        page_factory=open_playwright_page,
+        server_factory=server_factory,
+        ffmpeg=Ffmpeg(),
+        clock=lambda: datetime.now(UTC),
+        closers=(tts.aclose, close_clients),
     )

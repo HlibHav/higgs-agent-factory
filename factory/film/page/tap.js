@@ -18,6 +18,7 @@
     tapDest: null,
     agentDest: null,
     callers: new Map(),
+    spans: [],
     log: [],
     queue: [],
     lastBinaryT: 0,
@@ -63,20 +64,28 @@
   // --- AudioContext: keep the page's context, build the mic and tap destinations in it ---
   const NativeAudioContext = window.AudioContext;
   function adopt(ctx) {
-    if (film.ctx) return;
+    if (film.ctx && film.ctx.state !== "closed") return;
     film.ctx = ctx;
     film.micDest = ctx.createMediaStreamDestination();
     film.tapDest = ctx.createMediaStreamDestination(); // page output + caller + sync beep
     film.agentDest = ctx.createMediaStreamDestination(); // page output only (spike S-6)
     emit("ctx", { sampleRate: ctx.sampleRate, state: ctx.state });
   }
+  // The recorder loads callers and starts the take before the page's Start click creates its
+  // context, so the context may exist first (ensureCtx); the page's own `new AudioContext(...)`
+  // then gets that same object back (a constructor may return an object), already 24 kHz.
   class FilmAudioContext extends NativeAudioContext {
     constructor(...args) {
+      if (film.ctx && film.ctx.state !== "closed") return film.ctx;
       super(...args);
       adopt(this);
     }
   }
   window.AudioContext = FilmAudioContext;
+  film.ensureCtx = () => {
+    if (!film.ctx || film.ctx.state === "closed") new FilmAudioContext({ sampleRate: 24000 });
+    return film.ctx;
+  };
 
   // --- microphone: the page gets the caller stream ---
   const md = navigator.mediaDevices;
@@ -84,7 +93,7 @@
     const origGum = md.getUserMedia.bind(md);
     md.getUserMedia = async (constraints) => {
       if (constraints && constraints.audio) {
-        if (!film.ctx) adopt(new FilmAudioContext({ sampleRate: 24000 }));
+        film.ensureCtx();
         emit("gum", { sampleRate: film.ctx.sampleRate });
         return film.micDest.stream;
       }
@@ -112,6 +121,8 @@
       const startCtx = when === undefined || when < this.context.currentTime ? this.context.currentTime : when;
       const len = duration !== undefined ? duration : this.buffer.duration - (offset || 0);
       this.__film_span = { startCtx, endCtx: startCtx + len };
+      film.spans = film.spans.filter((s) => s.endCtx > this.context.currentTime - 30);
+      film.spans.push(this.__film_span);
       emit("chunk", {
         t_received: film.lastBinaryT,
         start: ctxToPerf(startCtx),
@@ -125,6 +136,7 @@
     const r = origStop.apply(this, arguments);
     if (span && film.ctx) {
       const at = when === undefined || when < film.ctx.currentTime ? film.ctx.currentTime : when;
+      span.endCtx = Math.min(span.endCtx, at); // a stopped source no longer plays past `at`
       emit("stop", {
         start: ctxToPerf(span.startCtx),
         end: ctxToPerf(span.endCtx),
@@ -175,6 +187,23 @@
         .observe(banner, { attributes: true, attributeFilter: ["hidden"] });
     }
   }
+  // The TTFA readout sits below the fold of a 1080p frame (AC-17): when it gets an entry, scroll
+  // just enough to bring the whole list into view with a margin; nothing else moves.
+  function watchTtfa() {
+    const list = document.getElementById("ttfaList");
+    if (!list) return;
+    new MutationObserver(() => {
+      if (!list.childElementCount) return;
+      const margin = 48;
+      const over = list.getBoundingClientRect().bottom + margin - window.innerHeight;
+      if (over > 0) window.scrollBy(0, over);
+    }).observe(list, { childList: true });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", watchTtfa, { once: true });
+  } else {
+    watchTtfa();
+  }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", watchDom, { once: true });
   } else {
@@ -197,32 +226,53 @@
   // Load 24 kHz mono 16-bit little-endian PCM (base64) under an id; resolves to its length in s.
   film.loadCaller = async (id, b64pcm) => {
     const data = decodePcm16(b64pcm);
+    film.ensureCtx();
     const buf = film.ctx.createBuffer(1, data.length, 24000);
     buf.getChannelData(0).set(data);
     film.callers.set(id, buf);
     return buf.duration;
   };
 
+  // True when an assistant source is scheduled to be audible at context time `ctxTime`.
+  film.assistantPlaying = (ctxTime) => film.spans.some((s) => s.startCtx <= ctxTime && ctxTime < s.endCtx);
+
   // Speak a loaded caller line into the page's microphone (and into the tap, so the take
   // recording holds both sides). atPerfMs: performance.now() time to start, or null for now.
-  film.playCaller = (id, atPerfMs) => {
+  // With requireAssistant the decision is taken just before atPerfMs, on everything the page has
+  // scheduled by then: if no assistant source is audible at atPerfMs the line is not played (a
+  // "caller_cancelled" event is logged instead), so a barge-in never lands on silence (AC-20).
+  film.playCaller = (id, atPerfMs, opts) => {
     const buf = film.callers.get(id);
     if (!buf) throw new Error("caller not loaded: " + id);
-    const src = film.ctx.createBufferSource();
-    src.__film_quiet = true;
-    src.buffer = buf;
-    origConnect.call(src, film.micDest);
-    origConnect.call(src, film.tapDest);
-    const nowCtx = film.ctx.currentTime;
-    const startCtx = atPerfMs === null || atPerfMs === undefined ? nowCtx : Math.max(nowCtx, perfToCtx(atPerfMs));
-    origStart.call(src, startCtx);
-    const t = ctxToPerf(startCtx);
-    emit("caller", { id, duration: buf.duration, emitted: performance.now() }, t);
-    return { t, duration: buf.duration };
+    film.ensureCtx();
+    const hasAt = atPerfMs !== null && atPerfMs !== undefined;
+    const schedule = () => {
+      const src = film.ctx.createBufferSource();
+      src.__film_quiet = true;
+      src.buffer = buf;
+      origConnect.call(src, film.micDest);
+      origConnect.call(src, film.tapDest);
+      const nowCtx = film.ctx.currentTime;
+      const startCtx = hasAt ? Math.max(nowCtx, perfToCtx(atPerfMs)) : nowCtx;
+      origStart.call(src, startCtx);
+      const t = ctxToPerf(startCtx);
+      emit("caller", { id, duration: buf.duration, emitted: performance.now() }, t);
+      return { t, duration: buf.duration };
+    };
+    if (opts && opts.requireAssistant && hasAt) {
+      const lead = 30; // ms before atPerfMs at which the decision is taken
+      setTimeout(() => {
+        if (film.assistantPlaying(perfToCtx(atPerfMs))) schedule();
+        else emit("caller_cancelled", { id, at: atPerfMs });
+      }, Math.max(0, atPerfMs - performance.now() - lead));
+      return { t: atPerfMs, duration: buf.duration, deferred: true };
+    }
+    return schedule();
   };
 
   // --- sync mark: 100 ms black overlay in the picture, 1 kHz 50 ms beep in the tap only ---
   film.syncMark = () => {
+    film.ensureCtx();
     const beepCtx = film.ctx.currentTime + 0.02;
     const osc = film.ctx.createOscillator();
     osc.frequency.value = 1000;
@@ -265,6 +315,7 @@
   }
 
   film.beginTake = () => {
+    film.ensureCtx();
     film.chunks = [];
     film.agentChunks = [];
     film.recorder = startRecorder(film.tapDest.stream, film.chunks);

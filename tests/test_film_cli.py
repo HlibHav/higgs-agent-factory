@@ -206,3 +206,23 @@ def test_run_ended_early_exits_1(tmp_path: Path, capsys: pytest.CaptureFixture[s
     captured = capsys.readouterr()
     assert "blocked: gate run" in captured.err and "take 1" in captured.out
     json.loads((h.out / "stems" / "manifest.json").read_text())
+
+
+def test_build_film_missing_key_names_variable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The real composition root: no key is read until a stem has to be spoken, and then the
+    refusal names the variable only (exit 2)."""
+    import asyncio
+
+    from factory.composition import ConfigError, build_film
+
+    app = build_film({}, tmp_path)  # building needs no key, no browser, no network
+    assert app.page_factory is not None and app.tts is not None
+    with pytest.raises(ConfigError, match="BOSON_API_KEY"):
+        asyncio.run(app.tts.synthesise("hello", "chloe"))
+    asyncio.run(app.aclose())
+
+    assert cli.main(["auditions"], env={}, out_dir=tmp_path, app_factory=build_film) == 2
+    err = capsys.readouterr().err
+    assert "BOSON_API_KEY" in err and "ANTHROPIC" not in err
