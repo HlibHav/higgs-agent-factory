@@ -8,7 +8,12 @@ import httpx2  # the anthropic SDK 2.x runs on httpx2, not httpx
 import pytest
 
 from factory.agent_spec.models import Rubric
-from factory.gate.judge import build_judge_prompt, judge_scenario, parse_judgment
+from factory.gate.judge import (
+    build_judge_prompt,
+    judge_scenario,
+    judge_scenario_outcome,
+    parse_judgment,
+)
 from factory.gate.judge_anthropic import AnthropicJudge
 from factory.gate.records import Judgment
 from factory.ports import JudgeRequest, ToolCall
@@ -54,6 +59,22 @@ def test_ac18_invalid_label_one_call() -> None:
     judge = FakeJudge(['{"label": "MAYBE"}', GOOD])
     assert asyncio.run(judge_scenario(judge, _request())) is None
     assert len(judge.requests) == 1  # no second call for the same scenario
+
+
+def test_ac63_long_invalid_reply_capped_and_flagged() -> None:
+    judge = FakeJudge(["x" * 5000])
+    outcome = asyncio.run(judge_scenario_outcome(judge, _request()))
+    assert outcome.judgment is None
+    assert outcome.raw_reply == "x" * 2000
+    assert outcome.raw_truncated is True
+    assert len(judge.requests) == 1
+
+
+def test_valid_reply_keeps_no_raw() -> None:
+    outcome = asyncio.run(judge_scenario_outcome(FakeJudge([GOOD]), _request()))
+    assert outcome.judgment is not None
+    assert outcome.raw_reply is None
+    assert outcome.raw_truncated is False
 
 
 @pytest.mark.parametrize(

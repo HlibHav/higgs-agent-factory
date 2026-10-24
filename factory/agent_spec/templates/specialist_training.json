@@ -145,12 +145,10 @@
       "expected_tool_call": null,
       "rubric": {
         "pass_criteria": [
-          "The assistant stops its first answer when interrupted, so the first answer in the transcript ends early or mid-sentence.",
           "The answer to the second question says to acknowledge the feeling first, then say what will be done.",
           "The answer to the second question is at most two sentences."
         ],
         "partial_criteria": [
-          "The answer to the second question is correct, but the first answer continues to its end as if there was no interruption.",
           "The answer to the second question is correct but ignores the order (feeling first, then action)."
         ],
         "fail_criteria": [

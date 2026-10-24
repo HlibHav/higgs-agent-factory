@@ -91,15 +91,11 @@ def test_load_template_returns_independent_copies() -> None:
 
 _ST5_RUBRIC = {
     "pass_criteria": [
-        "The assistant stops its first answer when interrupted, so the first answer in the "
-        "transcript ends early or mid-sentence.",
         "The answer to the second question says to acknowledge the feeling first, then say "
         "what will be done.",
         "The answer to the second question is at most two sentences.",
     ],
     "partial_criteria": [
-        "The answer to the second question is correct, but the first answer continues to its "
-        "end as if there was no interruption.",
         "The answer to the second question is correct but ignores the order (feeling first, "
         "then action).",
     ],
@@ -108,6 +104,20 @@ _ST5_RUBRIC = {
         "The answer to the second question puts the fix before acknowledging the feeling.",
     ],
 }
+
+
+_UNDECIDABLE = re.compile(
+    r"cut off|mid-sentence|ends early|stops its first answer|continues to its end", re.I
+)
+
+
+def test_no_criterion_asks_judge_to_see_a_cut_off() -> None:
+    # F27: the judge sees text, not audio, so it cannot decide whether an answer was cut off.
+    spec = load_template("specialist-training")
+    for scenario in spec.scenarios:
+        rubric = scenario.rubric
+        for line in [*rubric.pass_criteria, *rubric.partial_criteria, *rubric.fail_criteria]:
+            assert not _UNDECIDABLE.search(line), (scenario.id, line)
 
 
 def test_no_scripted_turn_has_an_internal_sentence_break() -> None:

@@ -5,6 +5,7 @@ untrusted model output: it goes into JSON-encoded data blocks and the instructio
 """
 
 import json
+from dataclasses import dataclass
 from typing import Any, get_args
 
 from factory.gate.records import Judgment, Label
@@ -12,6 +13,7 @@ from factory.ports import JudgePort, JudgeRequest
 
 _LABELS = frozenset(get_args(Label))
 _KEYS = frozenset({"label", "rationale", "evidence"})
+RAW_REPLY_MAX_CHARS = 2000
 
 _INSTRUCTIONS = """\
 You are grading one scenario of a voice agent against a rubric.
@@ -71,6 +73,23 @@ def parse_judgment(raw: str) -> Judgment | None:
     return Judgment(label=label, rationale=rationale, evidence=evidence)  # type: ignore[arg-type]
 
 
+@dataclass(frozen=True)
+class JudgeOutcome:
+    judgment: Judgment | None
+    # Untrusted model output kept as inert data only when the reply was invalid: it is never
+    # parsed again and never used as rationale or evidence.
+    raw_reply: str | None
+    raw_truncated: bool
+
+
+async def judge_scenario_outcome(judge: JudgePort, req: JudgeRequest) -> JudgeOutcome:
+    """Exactly one judge call; an invalid reply is kept capped, never retried (AC-18, AC-63)."""
+    raw = await judge.judge(req)
+    judgment = parse_judgment(raw)
+    if judgment is not None:
+        return JudgeOutcome(judgment, None, False)
+    return JudgeOutcome(None, raw[:RAW_REPLY_MAX_CHARS], len(raw) > RAW_REPLY_MAX_CHARS)
+
+
 async def judge_scenario(judge: JudgePort, req: JudgeRequest) -> Judgment | None:
-    """Exactly one judge call; an invalid reply is None and is never retried (AC-18)."""
-    return parse_judgment(await judge.judge(req))
+    return (await judge_scenario_outcome(judge, req)).judgment

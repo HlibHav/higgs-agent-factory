@@ -22,7 +22,7 @@ from factory.agent_spec.models import (
     Scenario,
 )
 from factory.agent_spec.validation import validate_agent_spec
-from factory.gate.judge import judge_scenario
+from factory.gate.judge import judge_scenario_outcome
 from factory.gate.playback import BYTES_PER_S, Sleep, play_turn, stream_silence_until, ttfa_ms
 from factory.gate.records import (
     Cause,
@@ -405,7 +405,8 @@ class _Run:
             transcript="\n".join(texts),
             tool_calls=list(calls),
         )
-        judgment = await judge_scenario(self.judge, request)  # exactly one call
+        outcome = await judge_scenario_outcome(self.judge, request)  # exactly one call
+        judgment = outcome.judgment
         expected = scenario.expected_tool_call
         self.scenarios.append(
             ScenarioRecord(
@@ -419,6 +420,9 @@ class _Run:
                     expected_call_match(expected, calls) if expected is not None else None
                 ),
                 audio_source="recorded" if "recorded" in sources else "synthesised",
+                judge_raw_reply=outcome.raw_reply if judgment is None else None,
+                judge_raw_truncated=outcome.raw_truncated if judgment is None else False,
+                transcript_chars=len(request.transcript) if judgment is None else None,
             )
         )
         if judgment is None:

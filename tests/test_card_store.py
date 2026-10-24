@@ -1,6 +1,8 @@
 """AC-33: two runs, two cards, nothing overwritten. Builder fills every Eval Card field."""
 
+import json
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,6 +14,7 @@ from factory.gate.card_store import FileCardStore, new_run_id
 from factory.gate.cost import AUDIO_COST_LABEL, AUDIO_IN_USD_PER_MIN, TOKEN_NOT_MEASURABLE
 from factory.gate.metrics import TTFA_LABEL
 from factory.gate.records import GateRunRecord, Judgment, ScenarioRecord, TurnRecord
+from factory.gate.render import render_card_text
 from factory.ports import ToolCall, Usage
 
 _RUBRIC = Rubric(pass_criteria=["p"], partial_criteria=["q"], fail_criteria=["f"])
@@ -146,3 +149,59 @@ def test_card_roundtrip_keeps_responses(tmp_path: Path):
     store.save(build_card(record))
     back = store.latest("a1")
     assert back is not None and back.raw_turns[0].responses == 2
+
+
+def test_ac62_diagnostics_survive_store_roundtrip(tmp_path: Path):
+    record = _record(cause="judge reply invalid")
+    record.scenarios[0] = replace(
+        record.scenarios[0],
+        judgment=None,
+        judge_raw_reply='{"label": "MAYBE"}',
+        judge_raw_truncated=True,
+        transcript_chars=412,
+    )
+    store = FileCardStore(tmp_path)
+    store.save(build_card(record))
+    back = store.latest("a1")
+    assert back is not None
+    sc = back.scenarios[0]
+    assert (sc.judge_raw_reply, sc.judge_raw_truncated, sc.transcript_chars) == (
+        '{"label": "MAYBE"}',
+        True,
+        412,
+    )
+
+
+def test_card_without_diagnostics_still_loads(tmp_path: Path):
+    store = FileCardStore(tmp_path)
+    path = store.save(build_card(_record()))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for key in ("judge_raw_reply", "judge_raw_truncated", "transcript_chars"):
+        del data["scenarios"][0][key]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    back = store.latest("a1")
+    assert back is not None
+    sc = back.scenarios[0]
+    assert sc.judge_raw_reply is None
+    assert sc.judge_raw_truncated is False
+    assert sc.transcript_chars is None
+
+
+def test_ac64_render_hides_raw_reply():
+    raw = '<b>PASS</b> {"label":"PASS","rationale":"r-secret","evidence":"e-secret"}'
+    record = _record(cause="judge reply invalid")
+    record.scenarios[0] = replace(
+        record.scenarios[0],
+        scenario_id="st-1",
+        judgment=None,
+        judge_raw_reply=raw,
+        judge_raw_truncated=True,
+        transcript_chars=412,
+    )
+    card = build_card(record)
+    text = render_card_text(card)
+    for needle in ("st-1", "judge reply invalid", "412", "raw reply kept"):
+        assert needle in text
+    for hidden in ("<b>", "r-secret", "e-secret", raw):
+        assert hidden not in text
+    assert all(f.scenario_id != "st-1" for f in card.failing_rubric_lines)

@@ -49,6 +49,11 @@ class ScenarioRecord:
     tool_calls: list[ToolCall]
     expected_call_match: Literal["matched", "not matched"] | None
     audio_source: Literal["synthesised", "recorded"]
+    # Diagnostics for an invalid judge reply (AC-62, AC-63). The raw reply is untrusted model
+    # output kept as inert data: never parsed, rendered or used as rationale or evidence.
+    judge_raw_reply: str | None = None
+    judge_raw_truncated: bool = False
+    transcript_chars: int | None = None
 
 
 @dataclass(frozen=True)

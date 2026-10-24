@@ -347,6 +347,16 @@ def test_invalid_judgment_is_incomplete_and_stops_the_run(tmp_path: Path) -> Non
     assert record.scenarios[0].judgment is None
 
 
+def test_ac62_invalid_reply_and_transcript_length_in_record(tmp_path: Path) -> None:
+    h = Harness(tmp_path, make_spec(), reply("r1", text="a" * 412), [BAD])
+    record = h.run()
+    assert record.cause == "judge reply invalid"
+    sc = record.scenarios[0]
+    assert sc.judge_raw_reply == '{"label": "MAYBE"}'
+    assert sc.judge_raw_truncated is False
+    assert sc.transcript_chars == 412
+
+
 def test_select_mock_first_matching_case_else_default() -> None:
     tool = ClientTool(
         name="t",

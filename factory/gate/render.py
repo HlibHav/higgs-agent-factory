@@ -25,6 +25,14 @@ def render_card_text(card: EvalCard) -> str:
         lines.append(f"  Fail: {'; '.join(f.rubric.fail_criteria)}")
         lines.append(f"  Rationale: {f.rationale}")
         lines.append(f"  Evidence: {f.evidence}")
+    for sc in card.scenarios:
+        if sc.judgment is None and sc.transcript_chars is not None:
+            # Never reads judge_raw_reply: it is untrusted model output (AC-64).
+            truncated = " (truncated)" if sc.judge_raw_truncated else ""
+            lines.append(
+                f"Scenario {sc.scenario_id}: judge reply invalid; transcript "
+                f"{sc.transcript_chars} chars; raw reply kept (not shown){truncated}"
+            )
     if card.ihbench_rq is None:
         lines.append("IHBench RQ: not available")
     else:
