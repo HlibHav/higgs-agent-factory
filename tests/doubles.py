@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from factory.agent_spec.models import AgentSpec
-from factory.ports import Clock, SessionEvent, SessionRefused, TtsError
+from factory.ports import AvatarError, AvatarInfo, Clock, SessionEvent, SessionRefused, TtsError
 
 
 @dataclass(frozen=True)
@@ -181,3 +181,43 @@ def make_spec(**overrides: Any) -> dict[str, Any]:
     spec = copy.deepcopy(_BASE_SPEC)
     spec.update(copy.deepcopy(overrides))
     return spec
+
+
+class FakeAvatar:
+    """`AvatarPort` double; `fail_audio` makes the avatar go down on the first PCM."""
+
+    def __init__(self, fail_audio: bool = False) -> None:
+        self.info = AvatarInfo("wss://x.livekit.cloud", "room-1", "viewer-tok", "boson-avatar")
+        self.fail_audio = fail_audio
+        self.audio_in: list[bytes] = []
+        self.clears = 0
+        self.flushes = 0
+        self.closed = 0
+
+    async def audio(self, pcm: bytes) -> None:
+        if self.fail_audio:
+            raise AvatarError("The avatar stopped (Test).")
+        self.audio_in.append(pcm)
+
+    async def clear(self) -> None:
+        self.clears += 1
+
+    async def flush(self) -> None:
+        self.flushes += 1
+
+    async def close(self) -> None:
+        self.closed += 1
+
+
+class FakeAvatarFactory:
+    def __init__(self, fail_audio: bool = False, error: Exception | None = None) -> None:
+        self.created: list[FakeAvatar] = []
+        self._fail_audio = fail_audio
+        self._error = error
+
+    async def __call__(self) -> FakeAvatar:
+        if self._error is not None:
+            raise self._error
+        avatar = FakeAvatar(self._fail_audio)
+        self.created.append(avatar)
+        return avatar

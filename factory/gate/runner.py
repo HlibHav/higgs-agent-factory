@@ -22,7 +22,7 @@ from factory.agent_spec.models import (
     Scenario,
 )
 from factory.agent_spec.validation import validate_agent_spec
-from factory.gate.judge import judge_scenario_outcome
+from factory.gate.judge import judge_scenario_agreed
 from factory.gate.playback import BYTES_PER_S, Sleep, play_turn, stream_silence_until, ttfa_ms
 from factory.gate.records import (
     Cause,
@@ -304,7 +304,9 @@ class _Run:
         audio: TurnAudioSource,
         judge: JudgePort,
         sleep: Sleep,
+        caller_voice: str | None = None,
     ) -> None:
+        self.caller_voice = caller_voice  # AC-80: overrides every scenario's user_voice
         self.spec = spec
         self.sessions = sessions
         self.audio = audio
@@ -348,7 +350,9 @@ class _Run:
             label = f"{scenario.id} turn {index + 1}"
             try:
                 cache[index] = await self.audio.audio_for(
-                    scenario.user_turns[index], scenario.user_voice, label=label
+                    scenario.user_turns[index],
+                    self.caller_voice or scenario.user_voice,
+                    label=label,
                 )
             except AudioMissing as exc:
                 detail = f"{exc.turn_label}: {exc.cause}" if exc.cause else exc.turn_label
@@ -405,8 +409,10 @@ class _Run:
             transcript="\n".join(texts),
             tool_calls=list(calls),
         )
-        outcome = await judge_scenario_outcome(self.judge, request)  # exactly one call
+        k = max(1, self.spec.budget.max_judge_calls_per_scenario)  # AC-75, within budget
+        outcome = await judge_scenario_agreed(self.judge, request, k)
         judgment = outcome.judgment
+        skill = self.spec.skill_of(scenario.id)
         expected = scenario.expected_tool_call
         self.scenarios.append(
             ScenarioRecord(
@@ -423,6 +429,10 @@ class _Run:
                 judge_raw_reply=outcome.raw_reply if judgment is None else None,
                 judge_raw_truncated=outcome.raw_truncated if judgment is None else False,
                 transcript_chars=len(request.transcript) if judgment is None else None,
+                skill_id=skill.id if skill else "main",
+                skill_name=skill.name if skill else "Main",
+                judge_labels=outcome.labels,
+                judge_agreed=outcome.agreed,
             )
         )
         if judgment is None:
@@ -574,6 +584,8 @@ class _Run:
             output_audio_s=self.meter.output_bytes / BYTES_PER_S,
             cause=self.cause,
             cause_detail=self.cause_detail,
+            agent_version=self.spec.version,
+            agent_spec=self.spec.model_dump(mode="json"),
         )
 
 
@@ -585,6 +597,7 @@ async def run_gate(
     judge: JudgePort,
     clock: Clock = time.monotonic,
     sleep: Sleep = asyncio.sleep,
+    caller_voice: str | None = None,
 ) -> GateRunRecord:
     """One session per scenario (AC-55), one audio meter for the run (AC-56). A cut-short run
     returns a record with `cause` set; a refused session raises `GateAborted` and yields no
@@ -594,6 +607,6 @@ async def run_gate(
     event times) comes from the session, so it is not read here.
     """
     check_limits(spec)
-    run = _Run(spec, sessions, audio, judge, sleep)
+    run = _Run(spec, sessions, audio, judge, sleep, caller_voice)
     await run.execute()
     return run.record(spec.id)

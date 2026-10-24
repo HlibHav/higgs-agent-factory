@@ -28,15 +28,17 @@ marked tentative.
 
 1. **20 s — the problem.** Anyone can spin up a voice agent in an afternoon. Nobody can tell you
    whether it is ready to talk to a customer.
-2. **60 s — brief → Agent Spec → Eval Card.** Pick the Specialist Training card, show the
-   generated Agent Spec, then the full Eval Card from a gate run made before the talk (its run id
-   and time on screen): scenario pass rate, IHBench RQ, TTFA p50/p95, barge-in stop time, cost,
-   verdict. Run one short scenario live so the room sees the gate is real.
-3. **60 s — talk to the agent.** A live conversation, with a deliberate interruption mid-sentence.
-   An agent that was not released can still talk, with a visible "not released" label.
-4. **40 s — what it means for Boson.** The IHBench client PR that lets Boson's own benchmark run
-   against Boson's own API, and the friction log ([FRICTION.md](FRICTION.md)) handed over as a
-   gift.
+2. **40 s — skills, not one prompt.** Specialist Training is a persona plus five skills, each with
+   its own procedure, tools and test scenarios. A brief can also produce a skill proposal before
+   any gate run.
+3. **60 s — gate and coach.** The v1 card is rejected, 4 of 6, and fails two skills. The judge
+   grades every scenario twice and reports its agreement. The coach rewrites only the failing
+   skills' procedures, and the re-run gate releases v2 at 6 of 6. The card diff shows what
+   changed. Say: one run, one round, and the coach sees the test.
+4. **40 s — talk to the agent** (through the Higgs Avatar if it is on). A live conversation, with
+   a deliberate interruption mid-sentence.
+5. **20 s — what it means for Boson.** "Agents that coach themselves", made measurable; the
+   IHBench client PR and the friction log handed over as a gift.
 
 Every number on screen has a row in [CLAIMS.md](CLAIMS.md).
 

@@ -4,7 +4,7 @@ Status: approved
 Tier: Full SDD — scorecard 6/6 (main session 6/6, re-scored by spec-creator 6/6)
 Supersedes: none
 Packages: root (single-package repo)
-Design sources: user text, 2026-10-24 (task brief sections 0, 2, 3 relayed by the main session; Glib's answers to Q1–Q3 and the judge-vendor decision); `docs/BRIEF.md`; `docs/reuse-map.md`; `docs/CLAIMS.md`; `docs/boson-protocol.md` (F1–F22); live smoke `results/smoke-20261024T145225Z.jsonl`; reference code in `vendor-ref/` (read-only)
+Design sources: user text, 2026-10-24 (task brief sections 0, 2, 3 relayed by the main session; Glib's answers to Q1–Q3 and the judge-vendor decision); `docs/BRIEF.md`; `docs/reuse-map.md`; `docs/CLAIMS.md`; `docs/boson-protocol.md` (F1–F22); live smoke `results/smoke-20261024T145225Z.jsonl`; reference code in `vendor-ref/` (read-only); delta 2026-10-24 (approved by Glib in chat, 2026-10-24): user text relayed by the main session (skills as a unit, per-skill evals, skill proposal, judge agreement, coach loop, Eval Card diff, caller voices, generator-eval research, avatar), with a researcher report on the avatar path (option B′, deferred)
 
 Boson API behaviour is cited by fact id from `docs/boson-protocol.md` and never restated here.
 Anything not in that file is UNVERIFIED.
@@ -49,7 +49,7 @@ Goals, in priority order (`docs/BRIEF.md`):
 - Reuse Boson's public pieces per `docs/reuse-map.md`; the differentiator is the gate.
 
 Non-goals:
-- Telephony, SIP, WebRTC (F9).
+- Telephony, SIP, WebRTC (F9). The avatar (P3) is deferred: it needs an ADR and Glib's sign-off on new LiveKit packages before any acceptance criteria are written.
 - Production auth, multi-user, more than one live session at a time.
 - Our own speech-to-speech stack, Realtime client, tool dispatch or barge-in handling (the
   runtime is `pipecat-boson`, `docs/reuse-map.md`).
@@ -57,8 +57,10 @@ Non-goals:
 - Gating release on IHBench RQ, TTFA or barge-in stop time (Glib, Q1: informational only).
 - Input audio transcription (F19, billed); scripted user turn texts are already known.
 - Marketing claims built on Boson's self-authored benchmarks, or comparing our numbers to them.
-- P3 live avatar acceptance. Lane L5 is a hint only; its acceptance criteria are added to this
-  spec by a later Changelog row if P2 is finished (F11).
+- The coach editing anything but a failing skill's procedure: never the persona, scenarios,
+  rubrics, budget, voice, tools or turn detection (AC-76).
+- Avatar acceptance and any avatar timing number on stage (deferred, see above).
+- Generator evaluation beyond a research note (`docs/research/2026-10-24-generator-evals.md`).
 - Real tool side effects: client tools are always mocked.
 - Competing with Feynman Flow; the harness is a community layer on the public API.
 
@@ -155,6 +157,28 @@ means a run against the live Boson API (the `live` marker, spends credits).
 
 ### End to end (P1 done)
 - AC-45 WHEN the gate runs on the Specialist Training agent against the live Boson API, the system shall produce a stored Eval Card with a verdict, TTFA p50/p95 with n ≥ 1, input and output audio minutes and the estimated audio cost. — proof: e2e — verify: with `BOSON_API_KEY` and `ANTHROPIC_API_KEY` set, run the gate on Specialist Training; expect a stored card with those fields filled from the run
+
+
+### Delta 2026-10-24: skills, per-skill evals, judge agreement, coach, card diff
+
+Agent Spec schema version 2 (contract change approved by Glib in chat, 2026-10-24). An agent is a
+`persona` plus a list of `skills`. Each skill has `id`, `name`, `purpose`, `procedure`, its own
+`tools` (same Tool contract) and its own `scenarios` (same Scenario contract, at least one). The
+session instructions are compiled from the persona followed by each skill's name, purpose and
+procedure; the session tools are the union of the skills' tools; the run's scenarios are the
+skills' scenarios in order.
+
+- AC-70 The system shall accept an Agent Spec with a persona and one or more skills, and shall reject a skill with no scenarios, two tools with the same name across skills, or two scenarios with the same id across skills, naming the field. — proof: red-first unit — verify: validate a spec with an empty skill, a duplicate tool name and a duplicate scenario id; expect three named issues
+- AC-71 WHEN a session is opened for a skills-based spec, the system shall send instructions compiled from the persona and every skill's name, purpose and procedure, and the union of the skills' tools. — proof: red-first unit — verify: two skills with one tool each; expect both procedures in the instructions and both tools in the session
+- AC-72 WHERE a raw spec is in the flat schema version 1 shape, the system shall load it as a persona with one skill, so stored cards and fixtures keep loading. — proof: red-first unit — verify: validate the version 1 base spec; expect one skill and the same compiled instructions
+- AC-73 The five templates shall be skills-based specs that validate. — proof: red-first unit — verify: load every template; expect schema version 2 and at least two skills each
+- AC-74 WHEN an Eval Card is produced, the system shall show for each skill its scenarios run, PASS count and pass rate, and shall set `released` only if every scenario of every skill is PASS with judge agreement. — proof: red-first unit — verify: two skills, one with a disagreed PASS; expect that skill not passed and the verdict `rejected`
+- AC-75 WHEN a scenario is judged, the system shall make k judge calls, k = the spec's `max_judge_calls_per_scenario` (templates: 2), and record every label; IF the valid labels differ, or one of k replies is invalid, THEN the scenario shall be marked "judge disagreed", carry the lowest valid label, and not count as PASS; IF all k replies are invalid, THEN AC-18 applies. The card shall show the judge agreement rate (agreed scenarios / judged scenarios). — proof: red-first unit — verify: replies PASS/PASS, PASS/PARTIAL, PASS/invalid; expect agreed PASS, disagreed PARTIAL, disagreed PASS-not-counted
+- AC-76 WHEN a gate run is not `released` and the coach is asked to run, the system shall make one coach model call per failing skill in each round, with that skill's procedure and its failing scenarios' rubrics, transcripts, rationales and evidence, and shall replace only those skills' procedures, increment the agent version and re-run the full gate; the coach shall stop after a `released` run or 2 rounds. — proof: red-first unit — verify: coach double returns a new procedure; expect every other spec field unchanged, version + 1, a second card stored with the parent run id
+- AC-77 The coached agent shall be shown as released only when its own gate run is `released`. — proof: red-first unit — verify: re-gate still rejected; expect verdict `rejected` on the second card
+- AC-78 WHEN two Eval Cards are compared, the system shall show the verdict change, each skill's pass-rate change, each scenario's label change, and TTFA p50/p95, barge-in p50 and estimated audio cost before and after, on the CLI and on the demo page. — proof: red-first unit — verify: diff a rejected and a released card; expect st-6 PARTIAL → PASS and the verdict change
+- AC-79 WHEN a brief is submitted on the demo page, the system shall show the proposed skills (name, purpose, tools, scenarios) of the generated spec before any gate run. — proof: red-first integration — verify: brief double returns a two-skill spec; expect both skills in the response
+- AC-80 WHERE a caller voice is given for a gate run, the system shall use that TTS 3 voice (F22) for every scripted user turn, and the TTS cache key shall include the voice. — proof: red-first unit — verify: run with caller voice "oliver"; expect every synthesis call with "oliver"
 
 ## Requirements coverage
 
@@ -398,7 +422,7 @@ Budget limits (Specialist Training values per AC-5):
 |---|---|
 | max scenarios per gate run | 6 |
 | max total audio per gate run (input + output) | 4 min |
-| max judge calls per scenario | 1 |
+| max judge calls per scenario | 2 (judge agreement, AC-75) |
 | max live session length | 3 min |
 
 System-wide limits (not per agent): free-text brief ≤ 1,000 characters (AC-2); turn quiet window 2 s (AC-57). Each scenario runs in its own Realtime session (AC-55); the per-run limits above apply across all of a run's sessions (AC-56).
@@ -575,3 +599,4 @@ Training is the P1 template and carries the AC-5 budget.
 | 2026-10-24 | Added AC-55…AC-61: one Realtime session per scenario with the run budget summed across sessions; a turn's reply ends after a 2 s quiet window, all responses in the window are joined for the judge, TTFA on the first, window silence counts toward budget; responses per turn recorded on the run and the card. Gate diagram, contracts, edge cases, coverage (R-32…R-34) and traceability updated. Status left as approved. | Spec described incomplete behaviour: live gate run `20261024T161045Z-d663176a` (rejected, 4/6) showed a VAD-split turn in st-5 whose real answer leaked into st-6, and shared history across scenarios. Glib's direction to do it properly; quiet window 2 s by Glib's answer. update mode |
 | 2026-10-24 | Added AC-62…AC-64: on an invalid judgment the run record and stored card keep the raw judge reply (first 2,000 characters, truncation flagged) and the transcript length; the shown card has only the length and a "raw reply kept" note. Scenario rubric contract: criteria must not ask the judge to detect a cut-off answer from the transcript (F27). Edge cases, Untrusted inputs, coverage (R-35), traceability updated; transcript open question narrowed. Status left as approved. | F27 (VERIFIED-RUN): transcript holds the full sentence after barge-in, so st-5 went PARTIAL in run `20261024T163013Z-00df50f2` while barge-in stop time was 252 ms. "judge reply invalid" on st-1 in runs `20261024T160618Z-6e8bdda7` and `20261024T162735Z-9c2c615d` could not be diagnosed from the card. Glib's request. update mode |
 | 2026-10-24 | traceability filled after review loop | Claude |
+| 2026-10-24 | Delta: Agent Spec schema version 2 with persona and skills (AC-70…AC-73), per-skill evals on the card (AC-74), judge agreement with k calls (AC-75), coach loop on one skill's procedure (AC-76, AC-77), Eval Card diff (AC-78), skill proposal on the page (AC-79), caller voice (AC-80). Avatar deferred pending an ADR; generator evaluation limited to a research note. Judge calls per scenario 1 → 2. Glib: "Зміну Agent Spec, тобто контракту, можемо робити. Approve даю." | approved by Glib in chat, 2026-10-24; written by the main session (spec-creator skipped for time, 75 minutes before the demo) |

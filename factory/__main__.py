@@ -11,10 +11,12 @@ import asyncio
 import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
+from factory.agent_spec.models import UserVoice
 from factory.agent_spec.templates import TEMPLATE_IDS
 from factory.composition import ConfigError, build_app
+from factory.gate.diff import diff_cards, render_diff_text
 from factory.gate.records import EvalCard
 from factory.gate.render import render_card_text
 from factory.gate.runner import GateAborted
@@ -35,17 +37,57 @@ def _parser() -> argparse.ArgumentParser:
     source = gate.add_mutually_exclusive_group(required=True)
     source.add_argument("--template", choices=TEMPLATE_IDS)
     source.add_argument("--brief", help="free-text brief (max 1,000 characters)")
+    gate.add_argument("--caller-voice", choices=get_args(UserVoice))
+    coach = sub.add_parser("coach", help="gate, then rewrite failing skills and re-gate")
+    coach.add_argument("--template", choices=TEMPLATE_IDS, required=True)
+    coach.add_argument("--rounds", type=int, default=2)
+    coach.add_argument("--fresh", action="store_true", help="run a new baseline gate first")
+    coach.add_argument("--caller-voice", choices=get_args(UserVoice))
+    diff = sub.add_parser("diff", help="diff the latest coached card against its parent")
+    diff.add_argument("agent_id")
     serve = sub.add_parser("serve", help="serve the demo page on 127.0.0.1")
     serve.add_argument("--port", type=int, default=DEFAULT_PORT)
     return parser
 
 
+async def _coach(app: Any, args: argparse.Namespace) -> int:
+    try:
+        result = await app.coach_template(
+            args.template,
+            rounds=args.rounds,
+            from_latest=not args.fresh,
+            caller_voice=args.caller_voice,
+        )
+    finally:
+        await app.aclose()
+    if isinstance(result, GateAborted):
+        print(result.error_text, file=sys.stderr)
+        print("Verdict: not released (no Eval Card stored).", file=sys.stderr)
+        return EXIT_REFUSED
+    for card in result:
+        print(render_card_text(card))
+        if card.coach_note:
+            print(f"Coach: {card.coach_note}")
+    print(render_diff_text(diff_cards(result[0], result[-1])))
+    return 0
+
+
+def _diff(app: Any, args: argparse.Namespace) -> int:
+    pair = app.coach_pair(args.agent_id)
+    if pair is None:
+        print(f"No coached card for {args.agent_id}.", file=sys.stderr)
+        return EXIT_REFUSED
+    print(render_diff_text(diff_cards(*pair)))
+    return 0
+
+
 async def _run(app: Any, args: argparse.Namespace) -> int:
     try:
+        extra = {"caller_voice": args.caller_voice} if args.caller_voice else {}
         if args.template:
-            result = await app.run_gate_for_template(args.template)
+            result = await app.run_gate_for_template(args.template, **extra)
         else:
-            result = await app.run_gate_for_brief(args.brief)
+            result = await app.run_gate_for_brief(args.brief, **extra)
     finally:
         await app.aclose()
     if isinstance(result, EvalCard):
@@ -80,6 +122,10 @@ def main(
         return EXIT_REFUSED
     if args.command == "serve":
         return _serve(app, args.port, server_runner)
+    if args.command == "diff":
+        return _diff(app, args)
+    if args.command == "coach":
+        return asyncio.run(_coach(app, args))
     return asyncio.run(_run(app, args))
 
 

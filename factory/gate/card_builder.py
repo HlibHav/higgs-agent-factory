@@ -2,9 +2,30 @@
 
 from factory.gate.cost import TOKEN_NOT_MEASURABLE, TokenCost, audio_cost, token_cost
 from factory.gate.metrics import bargein_summary, ttfa_summary
-from factory.gate.records import EvalCard, GateRunRecord, IhbenchRq
+from factory.gate.records import EvalCard, GateRunRecord, IhbenchRq, ScenarioRecord, SkillResult
 from factory.gate.verdict import decide_verdict
 from factory.ports import Usage
+
+
+def skill_results(scenarios: list[ScenarioRecord]) -> list[SkillResult]:
+    """AC-74: group scenario records by skill, in first-seen order."""
+    order: dict[str, list[ScenarioRecord]] = {}
+    for sc in scenarios:
+        order.setdefault(sc.skill_id, []).append(sc)
+    results = []
+    for skill_id, rows in order.items():
+        passed = sum(1 for r in rows if r.passed)
+        results.append(
+            SkillResult(
+                skill_id=skill_id,
+                name=rows[0].skill_name,
+                scenarios_run=len(rows),
+                passed=passed,
+                pass_rate=passed / len(rows),
+                released=passed == len(rows),
+            )
+        )
+    return results
 
 
 def build_card(record: GateRunRecord, ihbench: IhbenchRq | None = None) -> EvalCard:
@@ -17,7 +38,9 @@ def build_card(record: GateRunRecord, ihbench: IhbenchRq | None = None) -> EvalC
     audio = audio_cost(in_min, out_min)
     tokens = token_cost(record.usages)
     judged = [s for s in record.scenarios if s.judgment is not None]
-    passed = sum(1 for s in judged if s.judgment and s.judgment.label == "PASS")
+    passed = sum(1 for s in judged if s.passed)
+    voted = [s for s in judged if s.judge_agreed is not None]
+    agreement = sum(1 for s in voted if s.judge_agreed) / len(voted) if voted else None
     total: Usage | None = None
     text: str | None = TOKEN_NOT_MEASURABLE
     if isinstance(tokens, TokenCost):
@@ -50,4 +73,8 @@ def build_card(record: GateRunRecord, ihbench: IhbenchRq | None = None) -> EvalC
         token_usage_total=total,
         token_cost_text=text,
         raw_turns=record.turns,
+        skills=skill_results(record.scenarios),
+        judge_agreement_rate=agreement,
+        agent_version=record.agent_version,
+        agent_spec=record.agent_spec,
     )

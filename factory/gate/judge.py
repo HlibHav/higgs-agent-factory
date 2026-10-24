@@ -4,6 +4,7 @@ Everything the judge reads from a run (user turns, assistant transcript, tool ca
 untrusted model output: it goes into JSON-encoded data blocks and the instructions say so.
 """
 
+import asyncio
 import json
 from dataclasses import dataclass
 from typing import Any, get_args
@@ -93,3 +94,32 @@ async def judge_scenario_outcome(judge: JudgePort, req: JudgeRequest) -> JudgeOu
 
 async def judge_scenario(judge: JudgePort, req: JudgeRequest) -> Judgment | None:
     return (await judge_scenario_outcome(judge, req)).judgment
+
+
+_RANK = {"FAIL": 0, "PARTIAL": 1, "PASS": 2}
+
+
+@dataclass(frozen=True)
+class AgreedOutcome:
+    """AC-75: k judge calls folded into one judgment plus the agreement flag."""
+
+    judgment: Judgment | None
+    labels: list[Label]
+    agreed: bool | None
+    raw_reply: str | None
+    raw_truncated: bool
+
+
+async def judge_scenario_agreed(judge: JudgePort, req: JudgeRequest, k: int) -> AgreedOutcome:
+    """k independent calls in parallel. Differing valid labels, or any invalid reply next to a
+    valid one, mean "judge disagreed": the lowest valid label is kept and it never counts as
+    PASS. All replies invalid behaves as AC-18."""
+    outcomes = await asyncio.gather(*(judge_scenario_outcome(judge, req) for _ in range(k)))
+    valid = [o.judgment for o in outcomes if o.judgment is not None]
+    if not valid:
+        first = outcomes[0]
+        return AgreedOutcome(None, [], None, first.raw_reply, first.raw_truncated)
+    labels: list[Label] = [j.label for j in valid]
+    lowest = min(valid, key=lambda j: _RANK[j.label])
+    agreed = len(valid) == len(outcomes) and len(set(labels)) == 1
+    return AgreedOutcome(lowest, labels, agreed if k > 1 else None, None, False)
