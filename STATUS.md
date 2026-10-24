@@ -2,7 +2,7 @@
 
 Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude Code) on branch `feat/skills-coach-avatar` (worktree `.claude/worktrees/skills-coach-avatar`). Verified by: `uv run pytest -m "not live" -q` → `267 passed, 1 deselected`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `95 files already formatted`; `uv run mypy` → `Success: no issues found in 35 source files`.
 
-## New on this branch (2026-10-24, not yet merged to main)
+## New on main (merged 2026-10-24 ~18:12Z, `0faed07`)
 
 - Agent Spec schema 2: persona + skills (procedure, tools, scenarios per skill); all five templates migrated; flat v1 specs still load (AC-70…AC-73).
 - Per-skill results on the Eval Card and the page; judge grades every scenario k = 2 times, disagreement never counts as PASS, agreement rate on the card (AC-74, AC-75).
@@ -32,7 +32,7 @@ Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude 
 
 ## Blocked (Glib)
 
-- Merge `feat/skills-coach-avatar` into `main` (asked), restart the :8000 server, then record the demo (`docs/DEMO-RUNBOOK.md`). Check the avatar with headphones first.
+- Record the demo (`docs/DEMO-RUNBOOK.md`). Check the avatar with headphones first.
 - Review the four template rubrics before any of them is shown.
 
 ## Next
