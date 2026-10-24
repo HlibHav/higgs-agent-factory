@@ -13,9 +13,10 @@ are bounded.
 
 import asyncio
 import json
+import secrets
 import time
 from collections import deque
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -25,9 +26,11 @@ from fastapi import FastAPI, HTTPException, Request, Response, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from factory.agent_spec.generator import BriefTooLong, generate_from_brief
+from factory.agent_spec.models import AgentSpec
 from factory.composition import CheckFailed, FactoryApp
 from factory.gate.diff import diff_cards
 from factory.gate.render import render_card_text
+from factory.gate.runner import GateAborted
 from factory.live.session import EndReason, LiveSink, Sleep, run_live
 from factory.ports import AvatarError, AvatarPort, Clock
 
@@ -270,6 +273,13 @@ def _plain_ended(reason: EndReason, message: str) -> str:
     return json.dumps({"type": "ended", "reason": reason, "message": message})
 
 
+MAX_PROPOSALS = 20
+
+
+class _JobAborted(Exception):
+    """A gate or coach run ended without a card; the text is already safe to show."""
+
+
 def create_web_app(
     factory_app: FactoryApp,
     *,
@@ -286,6 +296,9 @@ def create_web_app(
     app = FastAPI(title="Higgs Agent Factory", lifespan=lifespan, docs_url=None, redoc_url=None)
     live_running = False
     pending_avatar: AvatarPort | None = None  # created by POST, claimed by the live WebSocket
+    proposals: dict[str, AgentSpec] = {}
+    job: dict[str, Any] = {}
+    job_task: asyncio.Task[None] | None = None
 
     async def drop_pending() -> None:
         nonlocal pending_avatar
@@ -365,7 +378,82 @@ def create_web_app(
             return JSONResponse(
                 {"issues": [i.model_dump(mode="json") for i in generated]}, status_code=422
             )
-        return generated.model_dump(mode="json")  # proposed, not gated: no gate run here (AC-79)
+        # Proposed, not gated (AC-79). The server keeps the proposal, so a save can never
+        # carry a spec the browser edited (AC-81).
+        proposal_id = secrets.token_hex(8)
+        proposals[proposal_id] = generated
+        while len(proposals) > MAX_PROPOSALS:
+            proposals.pop(next(iter(proposals)))
+        return {**generated.model_dump(mode="json"), "proposal_id": proposal_id}
+
+    @app.post("/api/proposals/{proposal_id}/save")
+    async def save_proposal(proposal_id: str) -> dict[str, Any]:
+        proposal = proposals.get(proposal_id)
+        if proposal is None:
+            raise HTTPException(404, "unknown or expired proposal")
+        try:
+            saved = factory_app.save_brief_agent(proposal)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        proposals.pop(proposal_id, None)
+        return {"agent_id": saved.id, "spec": saved.model_dump(mode="json")}
+
+    # --- background jobs: one full gate or coach run at a time (AC-82, AC-83) ------------
+
+    def _start_job(kind: str, agent_id: str, work: Callable[[], Awaitable[str]]) -> None:
+        nonlocal job_task
+        if job_task is not None and not job_task.done():
+            raise HTTPException(409, "A gate or coach run is already in progress.")
+        if factory_app.agent_spec(agent_id) is None:
+            raise HTTPException(404, "unknown agent")
+        job.clear()
+        job.update({"state": "running", "kind": kind, "agent_id": agent_id, "message": ""})
+
+        async def runner() -> None:
+            try:
+                job["message"] = await work()
+                job["state"] = "done"
+            except _JobAborted as exc:
+                job["state"] = "failed"
+                job["message"] = str(exc)
+            except Exception as exc:  # noqa: BLE001 - the page shows a safe message only
+                job["state"] = "failed"
+                job["message"] = f"The run failed ({type(exc).__name__})."
+
+        job_task = asyncio.create_task(runner())
+
+    @app.post("/api/agents/{agent_id}/gate", status_code=202)
+    async def start_gate(agent_id: str) -> dict[str, Any]:
+        async def work() -> str:
+            result = await factory_app.run_gate_for_agent(agent_id)
+            if isinstance(result, GateAborted):
+                raise _JobAborted(result.error_text)
+            job["run_id"] = result.run_id
+            return f"Gate run {result.run_id}: {result.verdict}."
+
+        _start_job("gate", agent_id, work)
+        return dict(job)
+
+    @app.post("/api/agents/{agent_id}/coach/run", status_code=202)
+    async def start_coach(agent_id: str) -> dict[str, Any]:
+        latest = factory_app.latest_card(agent_id)
+        if latest is None or latest.verdict != "rejected":
+            raise HTTPException(409, "The coach runs only on a rejected agent.")
+
+        async def work() -> str:
+            result = await factory_app.coach_template(agent_id, rounds=2, from_latest=True)
+            if isinstance(result, GateAborted):
+                raise _JobAborted(result.error_text)
+            last = result[-1]
+            job["run_id"] = last.run_id
+            return f"Coach finished after {len(result) - 1} round(s): {last.verdict}."
+
+        _start_job("coach", agent_id, work)
+        return dict(job)
+
+    @app.get("/api/jobs/current")
+    async def current_job() -> dict[str, Any]:
+        return dict(job) if job else {"state": "idle"}
 
     @app.get("/api/agents/{agent_id}/scenarios")
     async def scenarios(agent_id: str) -> list[dict[str, str]]:

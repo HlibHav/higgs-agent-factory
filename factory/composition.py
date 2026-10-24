@@ -10,7 +10,10 @@ the key goes in the handshake header only, which the session adapter sets (F23);
 """
 
 import base64
+import json
 import os
+import re
+import secrets
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -22,7 +25,7 @@ import httpx
 
 from factory.agent_spec.brief_anthropic import AnthropicBriefModel
 from factory.agent_spec.generator import BriefTooLong, generate_from_brief
-from factory.agent_spec.models import AgentSpec, SpecIssue
+from factory.agent_spec.models import AgentSpec, ClientTool, SpecIssue
 from factory.agent_spec.templates import TEMPLATE_IDS, TemplateNotAvailable, load_template
 from factory.agent_spec.validation import validate_agent_spec
 from factory.coach.coach import coach_spec
@@ -56,6 +59,9 @@ AVATAR_MAX_DURATION_S = 600  # F11: ends at expires_at even if we never delete i
 
 
 _ACRONYMS = {"ai": "AI"}
+
+
+_BRIEF_ID = re.compile(r"brief-[a-z0-9-]{1,48}")
 
 
 class ConfigError(Exception):
@@ -121,6 +127,7 @@ class FactoryApp:
     last_path: Path | None = None
     live_sessions: SessionFactory | None = None  # live pages need PCM in the audio deltas
     avatar: AvatarFactory | None = None  # None: avatar not configured (LIVEKIT_* unset)
+    agents_dir: Path | None = None  # saved brief agents (AC-81); None: none can be saved
     _closers: tuple[Callable[[], Awaitable[None]], ...] = ()
 
     async def run_gate_for_template(
@@ -141,10 +148,9 @@ class FactoryApp:
     ) -> list[EvalCard] | GateAborted:
         """AC-76, AC-77: gate, then coach and re-gate while rejected. Each card's verdict is
         its own gate's verdict; the coach never sets it."""
-        try:
-            template = load_template(template_id)
-        except TemplateNotAvailable as exc:
-            return GateAborted(f"Template unavailable: {exc}.")
+        template = self._base_spec(template_id)
+        if template is None:
+            return GateAborted(f"Unknown agent: {template_id}.")
         if self.coach_model is None:
             return GateAborted("No coach model is configured.")
         first: EvalCard | GateAborted | None = None
@@ -254,19 +260,76 @@ class FactoryApp:
             except TemplateNotAvailable:
                 description, available = "Card text pending.", False
             cards.append(TemplateCard(template_id, name, description, None, available))
+        for agent in self.saved_agents():  # AC-81: saved brief agents beside the templates
+            skills = ", ".join(k.name for k in agent.skills)
+            cards.append(
+                TemplateCard(agent.id, f"From brief: {agent.role[:60]}", skills, None, True)
+            )
         return cards
 
     def agent_spec(self, agent_id: str) -> AgentSpec | None:
         """The spec whose id is `agent_id`: the latest coached version when a stored card holds
-        one (agent_version > 1), else the template."""
+        one (agent_version > 1), else the template or the saved brief agent."""
+        base = self._base_spec(agent_id)
+        if base is None:
+            return None
+        return self._coached(agent_id) or base
+
+    def _base_spec(self, agent_id: str) -> AgentSpec | None:
         for template_id in TEMPLATE_IDS:
             try:
                 spec = load_template(template_id)
             except TemplateNotAvailable:
                 continue
             if spec.id == agent_id:
-                return self._coached(agent_id) or spec
-        return None
+                return spec
+        return self._saved(agent_id)
+
+    # --- saved brief agents (AC-81) ------------------------------------------------------
+
+    def _saved(self, agent_id: str) -> AgentSpec | None:
+        if self.agents_dir is None or not _BRIEF_ID.fullmatch(agent_id):
+            return None
+        path = self.agents_dir / f"{agent_id}.json"
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        checked = validate_agent_spec(raw) if isinstance(raw, dict) else None
+        return checked if isinstance(checked, AgentSpec) else None
+
+    def saved_agents(self) -> list[AgentSpec]:
+        if self.agents_dir is None or not self.agents_dir.is_dir():
+            return []
+        found = [self._saved(p.stem) for p in sorted(self.agents_dir.glob("brief-*.json"))]
+        return [a for a in found if a is not None]
+
+    def save_brief_agent(self, spec: AgentSpec) -> AgentSpec:
+        """Store a generated spec under a fresh `brief-` id. Raises `ValueError` when it cannot
+        be saved; a server tool is refused (security finding S2)."""
+        if self.agents_dir is None:
+            raise ValueError("Saving agents is not configured.")
+        if spec.source.kind != "brief":
+            raise ValueError("Only a spec generated from a brief can be saved.")
+        if any(not isinstance(t, ClientTool) for t in spec.tools):
+            raise ValueError("A generated agent may not use server tools.")
+        slug = re.sub(r"[^a-z0-9]+", "-", spec.id.lower()).strip("-")[:32] or "agent"
+        agent_id = f"brief-{slug}-{secrets.token_hex(3)}"
+        saved = spec.model_copy(update={"id": agent_id, "version": 1})
+        checked = validate_agent_spec(saved.model_dump(mode="json"))
+        if not isinstance(checked, AgentSpec):
+            raise ValueError("The proposal does not validate.")
+        self.agents_dir.mkdir(parents=True, exist_ok=True)
+        with (self.agents_dir / f"{agent_id}.json").open("x", encoding="utf-8") as f:
+            f.write(checked.model_dump_json(indent=2))
+        return checked
+
+    async def run_gate_for_agent(self, agent_id: str) -> EvalCard | GateAborted:
+        """AC-82: a full gate run on the current version of any known agent."""
+        spec = self.agent_spec(agent_id)
+        if spec is None:
+            return GateAborted(f"Unknown agent: {agent_id}.")
+        return await self._gate(spec)
 
     def _coached(self, agent_id: str) -> AgentSpec | None:
         card = self.latest_card(agent_id)
@@ -360,6 +423,7 @@ def build_app(env: Mapping[str, str] | None, results_dir: Path) -> FactoryApp:
         ),
         judge=AnthropicJudge(llm, model_id=judge_model),
         store=FileCardStore(results_dir / "cards"),
+        agents_dir=results_dir / "agents",
         brief_model=AnthropicBriefModel(llm, model_id=judge_model),
         coach_model=AnthropicCoachModel(llm, model_id=judge_model),
         _closers=(http.aclose, llm.close),

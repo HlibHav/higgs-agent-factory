@@ -676,3 +676,100 @@ def test_inbox_is_bounded_and_end_always_lands() -> None:
         assert 0 < count <= 100
 
     asyncio.run(main_())
+
+
+# --- AC-81…AC-84: brief agents are first-class on the page ------------------------------
+
+
+def _saving_app(tmp_path: Path, reply: str | None = None) -> FactoryApp:
+    app = _app(tmp_path)
+    app.agents_dir = tmp_path / "agents"
+    app.brief_model = FakeBriefModel(reply or _two_skill_reply())
+    return app
+
+
+def _propose_and_save(client: TestClient) -> str:
+    proposal = client.post("/api/brief", json={"brief": "a shop trainer"}).json()
+    saved = client.post(f"/api/proposals/{proposal['proposal_id']}/save")
+    assert saved.status_code == 200, saved.text
+    agent_id: str = saved.json()["agent_id"]
+    return agent_id
+
+
+def test_ac81_saved_proposal_is_listed_and_loadable(tmp_path: Path) -> None:
+    client = _client(_saving_app(tmp_path))
+    agent_id = _propose_and_save(client)
+    assert agent_id.startswith("brief-")
+    assert agent_id in [t["template_id"] for t in client.get("/api/templates").json()]
+    spec = client.get(f"/api/agents/{agent_id}/spec").json()
+    assert [k["id"] for k in spec["skills"]] == ["greet", "quote"]
+    assert client.post("/api/proposals/nope/save").status_code == 404
+
+
+def test_ac81_proposal_with_a_server_tool_is_refused(tmp_path: Path) -> None:
+    raw = json.loads(_two_skill_reply())
+    raw["skills"][0]["tools"] = [{"kind": "server", "name": "web_search"}]
+    client = _client(_saving_app(tmp_path, json.dumps(raw)))
+    proposal = client.post("/api/brief", json={"brief": "x"}).json()
+    response = client.post(f"/api/proposals/{proposal['proposal_id']}/save")
+    assert response.status_code == 422 and "server tools" in response.json()["detail"]
+    assert not list((tmp_path / "agents").glob("*.json"))
+
+
+def _wait_job(client: TestClient) -> dict[str, Any]:
+    for _ in range(200):
+        job: dict[str, Any] = client.get("/api/jobs/current").json()
+        if job["state"] != "running":
+            return job
+        time.sleep(0.01)
+    raise AssertionError("job did not finish")
+
+
+def test_ac82_gate_job_runs_once_at_a_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _saving_app(tmp_path)
+    release = asyncio.Event()
+    card, _ = _store_card(tmp_path, AGENT, "PASS", run_id="20261024T140000Z-cc")
+
+    async def fake_gate(agent_id: str) -> Any:
+        await release.wait()
+        return card
+
+    monkeypatch.setattr(app, "run_gate_for_agent", fake_gate)
+    with _client(app) as client:
+        agent_id = _propose_and_save(client)
+        assert client.post(f"/api/agents/{agent_id}/gate").status_code == 202
+        assert client.post(f"/api/agents/{agent_id}/gate").status_code == 409
+        assert client.get("/api/jobs/current").json()["state"] == "running"
+        client.portal.call(release.set)  # type: ignore[union-attr]
+        job = _wait_job(client)
+    assert job["state"] == "done" and job["run_id"] == card.run_id
+    assert client.post("/api/agents/nope/gate").status_code in (404, 409)
+
+
+def test_ac83_coach_job_only_on_a_rejected_agent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path)
+    coached, _ = _store_card(tmp_path, AGENT, "PASS", run_id="20261024T150000Z-dd")
+    calls: list[str] = []
+
+    async def fake_coach(agent_id: str, **kw: Any) -> Any:
+        calls.append(agent_id)
+        return [coached, coached]
+
+    monkeypatch.setattr(app, "coach_template", fake_coach)
+    with _client(app) as client:
+        assert client.post(f"/api/agents/{AGENT}/coach/run").status_code == 409  # no card yet
+        _store_card(tmp_path, AGENT, "FAIL", run_id="20261024T160000Z-ee")
+        assert client.post(f"/api/agents/{AGENT}/coach/run").status_code == 202
+        job = _wait_job(client)
+    assert job["state"] == "done" and calls == [AGENT]
+
+
+def test_ac84_saved_agent_has_scenarios_for_the_single_check(tmp_path: Path) -> None:
+    app = _saving_app(tmp_path)
+    client = _client(app)
+    agent_id = _propose_and_save(client)
+    assert [s["scenario_id"] for s in client.get(f"/api/agents/{agent_id}/scenarios").json()]
+    assert app.agent_spec(agent_id) is not None
+    assert app.agent_spec("brief-../../etc") is None
