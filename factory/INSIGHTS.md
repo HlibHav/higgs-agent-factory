@@ -16,6 +16,10 @@ Insert-only. Format and rules: `engineering-paved-path:engineering-insights` (`r
 
 - 2026-10-24: Env is read only in `factory/composition.py` (`build_app(None, …)` resolves `os.environ`); entries pass nothing. SDK imports stay in adapters; composition.py is the open exception (finding A1, waiting on Glib).
 
+- 2026-10-24: Agent Spec v2 keeps `instructions`/`tools`/`scenarios` as plain `@property` views over persona + skills, so runtime, runner and live session did not change; a `mode="before"` validator lifts flat v1 dicts (fixtures, old cards). Plain properties stay out of `model_dump` and the JSON schema the generator sees; `computed_field` would leak them.
+- 2026-10-24: Skill-level grouping changed the outcome. The flat spec failed only st-6 (5/6), while the same policy split into skills failed st-2 and st-6 (4/6, run `20261024T174839Z-6f4ab3b5`). Compare cards across contract versions with care.
+- 2026-10-24: The coach overfits to the visible test. Its refund procedure quoted st-2's own "30 euros" example. Coach prompts see the failing transcript, so a released v2 proves the loop, not generalisation. Held-out scenarios per skill would test that.
+
 ## Tool & Library Notes
 
 - 2026-10-24: `AsyncAnthropic.messages.create` is overloaded; a Protocol member typed as a read-only property returning `Callable[..., Awaitable[Any]]` satisfies mypy, a plain `async def create(**kwargs)` does not.
