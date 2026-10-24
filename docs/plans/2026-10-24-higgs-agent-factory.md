@@ -387,8 +387,83 @@ DAG levels: 0 → {L1, L2, L3r, L3c} → J → L4. *Cuttable* steps: 6b, 13b, 17
    - skills: none — project rules only
    - turns green: AC-14, AC-15, AC-16, AC-17, AC-20, AC-22, AC-24 (runner halves)
    - test first: `tests/test_gate_runner.py`, test_one_judge_call_per_scenario_budget: budget `max_judge_calls_per_scenario` is never exceeded
-   - interfaces: produces `async run_gate(spec: AgentSpec, *, sessions: SessionFactory, audio: TurnAudioSource, judge: JudgePort, clock: Clock = time.monotonic) -> GateRunRecord`. One session per gate run. `SessionEnded` cause → record `cause` and stop. `SessionRefused` → raise `GateAborted(error_text)` with no record. Input seconds = appended bytes / 48,000, output seconds = delta bytes / 48,000 (24 kHz s16le, F4); when input + output reaches `budget.max_audio_s_per_run` → cause "budget reached". A client `ToolCall` → `send_tool_output(call_id, select_mock(tool, args))`. `OtherEvent` is ignored. An invalid judgment → cause "judge reply invalid". `AudioMissing` → cause "audio missing", `cause_detail` = turn label. `select_mock(tool: ClientTool, arguments: dict) -> str` (first `ArgCase` whose `when` is a subset of the arguments, else `default_output`).
+   - interfaces: produces `async run_gate(spec: AgentSpec, *, sessions: SessionFactory, audio: TurnAudioSource, judge: JudgePort, clock: Clock = time.monotonic) -> GateRunRecord`. One session per scenario (AC-55): each scenario opens its own session from `sessions()`, runs its turns, then closes it. A late response after the scenario ends is dropped with that session. A single run-wide `_Meter` sums input and output bytes across all scenario sessions against `budget.max_audio_s_per_run` (AC-56). A refused session raises `GateAborted(error_text)` and leaves no record (AC-20). *(Replaced 2026-10-24: was "One session per gate run"; see steps 16c–16i.)* `SessionEnded` cause → record `cause` and stop. `SessionRefused` → raise `GateAborted(error_text)` with no record. Input seconds = appended bytes / 48,000, output seconds = delta bytes / 48,000 (24 kHz s16le, F4); when input + output reaches `budget.max_audio_s_per_run` → cause "budget reached". A client `ToolCall` → `send_tool_output(call_id, select_mock(tool, args))`. `OtherEvent` is ignored. An invalid judgment → cause "judge reply invalid". `AudioMissing` → cause "audio missing", `cause_detail` = turn label. `select_mock(tool: ClientTool, arguments: dict) -> str` (first `ArgCase` whose `when` is a subset of the arguments, else `default_output`).
    - verify: `uv run pytest -m "not live" tests/test_gate_runner.py` → passed
+
+16c. backend factory: response-start event and per-session test doubles *(delta 2026-10-24, AC-55…AC-61, after live gate run `20261024T161045Z-d663176a`)*
+   - files: `factory/ports.py`, `factory/runtime/boson_session.py`, `tests/doubles.py`, `tests/fake_realtime_server.py`, `tests/test_runtime_session.py`, `tests/test_contracts.py` (changed)
+   - layer: ports / adapter / test fixtures
+   - skills: none — project rules only
+   - turns green: none
+   - test first: `tests/test_runtime_session.py`, test_response_created_maps_to_event: the fake server sends `response.created` with `response.id = "r1"`; `events()` yields `ResponseCreated("r1", t)` (F17), not `OtherEvent`. Also `tests/test_contracts.py`, test_fake_server_scripts_per_connection: with `scripts=[[…a…], […b…]]`, the first connection gets script a, the second gets script b, and each `Received` carries its `conn` index.
+   - interfaces: produces `@dataclass(frozen=True) class ResponseCreated(response_id: str, t: float)`, added to the `SessionEvent` union. `BosonRealtimeSession` maps `response.created` to it, with an `# F17` comment. `FakeSessionFactory(script=None, clock=…, *, scripts: list[list[SessionEvent | Delay | Refuse]] | None = None, restamp: bool = False)`: call k gets `scripts[k]`, and the old `script` still works for every call. `FakeSession(..., restamp: bool = False)`: when True, each yielded event is `dataclasses.replace(event, t=clock())`, so window timing in tests uses real time. `fake_realtime_server(script=None, *, scripts=None, auto_ack=True)`: `Received(event, t, conn: int)`.
+   - verify: `uv run pytest -m "not live" tests/test_runtime_session.py -k response_created` → 1 passed; `uv run pytest -m "not live" tests/test_contracts.py` → all passed
+
+16d. backend factory: one session per scenario, budget summed across sessions
+   - files: `factory/gate/runner.py`, `tests/test_gate_runner.py` (changed)
+   - layer: service
+   - skills: none — project rules only
+   - turns green: AC-55, AC-56
+   - test first: none beyond the red-first tests. Red-first: `tests/test_gate_runner.py`, test_ac55_one_session_per_scenario: three scenarios with distinct TTS PCM per text (a `FakeTts` subclass in the test returns bytes derived from the text) and `FakeSessionFactory(scripts=[s1, s2, s3])`. Expect `factory.calls == 3`, every session `closed`, each session's audio sends to hold only its own scenario's speech bytes (plus silence), and each `FakeJudge` request transcript to hold only its own session's transcript text. Then test_ac56_budget_sums_across_sessions: limit 10 s, three scenarios of about 4 s of input audio each (TTS PCM 4.0 s, no-op `sleep`, `QUIET_WINDOW_S` set to 0.05); expect `cause == "budget reached"` with 2 complete scenario records and the stop inside the third (`factory.calls == 3`). Update `test_happy_path_records_scenario_ttfa_usage_and_audio` line 177 from `calls == 1` to `calls == len(spec.scenarios)`. This follows the spec change (AC-55), not the code.
+   - interfaces: produces `class _Meter(limit_s: float)` with `input_bytes`, `output_bytes`, `over_budget() -> bool`, created once per run. `_MeteredSession(session, meter: _Meter, wake: asyncio.Queue)` counts into the shared meter. `_Run` keeps the run-wide lists (`scenarios`, `turns`, `usages`, `cause`) and the meter. A new `_ScenarioSession` holds what lives for one scenario: `queue`, `carry`, `_pump_task`, the metered session, plus `async open(spec)` and `async shutdown()`. `_Run._scenario(scenario)` opens a `_ScenarioSession` from `sessions()`, runs the turns, and shuts it down in `finally`. `run_gate` signature unchanged. `record()` reads input and output seconds from the meter.
+   - verify: `uv run pytest -m "not live" tests/test_gate_runner.py -k "ac55 or ac56"` → 2 passed, failing run recorded first
+
+16e. backend factory: 2 s quiet window ends a turn, responses joined, window silence counted
+   - files: `factory/gate/runner.py`, `tests/test_gate_runner.py` (changed)
+   - layer: service
+   - skills: none — project rules only
+   - turns green: AC-57, AC-58, AC-60
+   - test first: `tests/test_gate_runner.py`, test_quiet_window_default_is_two_seconds: `runner.QUIET_WINDOW_S == 2.0`. Add an autouse fixture in `tests/test_gate_runner.py`, `_short_quiet_window(monkeypatch)`, that sets `runner.QUIET_WINDOW_S = 0.05` for every test not marked `@pytest.mark.real_window`. Register that marker in `tests/conftest.py` with `config.addinivalue_line` (the project's `--strict-markers`). The AC-57, AC-58 and AC-60 tests use the real 2.0 s. Red-first:
+     - test_ac57_turn_ends_two_seconds_after_last_response (`restamp=True`): A created, delta, done; Delay 1.2; B created, delta, done. Expect the first audio send of the next scripted turn ≥ B's `done.t` + 2.0 − 0.1, and not within 2 s of A's done.
+     - test_ac58_split_reply_joined_for_its_own_scenario_only: two scenarios. st-5's session script has transcript "No problem." in response A, then Delay 1.0, then "Acknowledge their feeling first, then say what you will fix." in response B. st-6 has its own script. Expect st-5's judge request transcript to contain both texts in that order, and st-6's request to contain neither.
+     - test_ac60_window_silence_counts_toward_budget: one turn of 1.0 s of speech, real 2 s window. Expect `record.input_audio_s >= 1.0 + 2.0 - 0.15`.
+   - interfaces: produces `QUIET_WINDOW_S: float = 2.0` (module constant, read at call time so tests can shrink it) and `_ScenarioSession.next_event(timeout: float | None = None) -> SessionEvent | None` (None on timeout; carry is drained first).
+
+     New `_read_reply` loop:
+     - A response counts as started at `ResponseCreated` or at the first event that carries an unseen `response_id`, whichever comes first. Its `response_id` is appended to `reply.response_ids` in start order.
+     - On a `ResponseDone` that ends reading, the loop no longer breaks. It runs a quiet window: it starts `stream_silence_until(session, window_stop, max_s=QUIET_WINDOW_S)` and waits on `next_event(timeout=remaining)`. If a new response starts before the window ends, it stops the silence and goes back to reading; the window restarts at that response's done. If the window elapses, the turn ends. Any non-start event inside the window is handled as before (tool calls, usage), and the window keeps running.
+     - The reply text is `" ".join(text of each response in start order)`, where one response's text is its concatenated transcript deltas (F18).
+     - A pending client-tool follow-up still waits without a timeout, as now, and its response counts toward `responses`.
+     - No quiet window on a turn whose reply was interrupted: that reply ends at the interrupted response's `ResponseDone`, as now (AC-28 path unchanged).
+     - The run-wide meter counts window silence like any other input (AC-60), and `_BudgetReached` can fire inside the window.
+   - verify: `uv run pytest -m "not live" tests/test_gate_runner.py -k "ac57 or ac58 or ac60 or quiet_window"` → 4 passed, failing run recorded first
+
+16f. backend factory: TTFA on the first response only
+   - files: `factory/gate/runner.py`, `tests/test_gate_runner.py` (changed)
+   - layer: service
+   - skills: none — project rules only
+   - turns green: AC-59
+   - test first: none beyond the red-first test. Red-first: `tests/test_gate_runner.py`, test_ac59_ttfa_on_first_response_only (`restamp=True`, real window): one turn, then Delay 0.4, delta of response A, done A, then Delay 1.2, delta of response B, done B. Expect exactly one `TurnRecord` for the turn, with `ttfa_ms` 400 ± 50. If it passes on the first run (the current code already takes the first delta), record that run as the evidence and say so in the implementer report. Do not weaken the assertion to force a red run.
+   - interfaces: `reply.ttfa_ms` is set only from the first `AudioDelta` whose `response_id == reply.response_ids[0]`
+   - verify: `uv run pytest -m "not live" tests/test_gate_runner.py -k ac59` → 1 passed
+
+16g. backend factory: responses per turn in the record and on the card
+   - files: `factory/gate/records.py`, `factory/gate/runner.py`, `factory/gate/render.py`, `tests/test_gate_runner.py`, `tests/test_card_store.py` (changed)
+   - layer: domain / service
+   - skills: none — project rules only
+   - turns green: AC-61
+   - test first: none beyond the red-first test. Red-first: `tests/test_gate_runner.py`, test_ac61_responses_per_turn_recorded_and_shown: one scenario with a split turn (two responses inside the window) and one normal turn. Expect `record.turns[*].responses == [2, 1]`; `build_card(record)` keeps them in `raw_turns`; `render_card_text(card)` contains `responses per turn` and both counts with their scenario id and turn number. Also `tests/test_card_store.py`, test_card_roundtrip_keeps_responses: save, then `latest()`, keeps `responses == 2`.
+   - interfaces: `TurnRecord` gains a last field, `responses: int = 1` (the default keeps existing constructors and stored cards valid). The runner writes `len(reply.response_ids)` into it. `render_card_text` adds one line, `Responses per turn: <scenario_id> turn <n> = <count>, …`, with counts above 1 marked `(split)`. `EvalCard` and `build_card` are unchanged; the field travels through `raw_turns`.
+   - verify: `uv run pytest -m "not live" tests/test_gate_runner.py -k ac61` → 1 passed; `uv run pytest -m "not live" tests/test_card_store.py` → all passed
+
+16h. backend factory: st-5 template rewording (no internal pause, rubric unchanged)
+   - files: `factory/agent_spec/templates/specialist_training.json`, `tests/test_templates.py` (changed)
+   - layer: domain data
+   - skills: none — project rules only
+   - turns green: none (fixes the live defect's trigger; the AC-57/58 guards cover the general case)
+   - test first: `tests/test_templates.py`, test_no_scripted_turn_has_an_internal_sentence_break: for every Specialist Training user turn, `re.search(r"[.?!…](?=.)", text.strip()) is None`, meaning no sentence end before the final character. Also test_st5_rubric_unchanged: st-5's `rubric` equals the dict in the current file (hard-coded in the test before the edit).
+   - interfaces: st-5 turn 2 text becomes one sentence with no internal stop, for example `"Which comes first with an angry customer, the apology or the fix?"`. `interrupt_after_assistant_ms` stays 1500. Rubric, voice and the other turns are unchanged. The TTS cache key changes, so the next live run makes one new TTS 3 request for this turn (F22).
+   - verify: `uv run pytest -m "not live" tests/test_templates.py` → all passed (the 4 xfailed placeholder templates are unchanged)
+
+16i. backend factory: wire confirmation with several sessions
+   - files: `tests/test_gate_wire.py` (changed)
+   - layer: test
+   - skills: none — project rules only
+   - turns green: none (wire-level confirmation of AC-55 through the real adapter)
+   - test first: `tests/test_gate_wire.py`, test_wire_one_connection_per_scenario: a two-scenario spec against `fake_realtime_server(scripts=[a, b])` with `QUIET_WINDOW_S` monkeypatched to 0.05. Expect two connections (`conn` 0 and 1), each with its own `session.update`, and the stored card has 2 scenarios.
+   - interfaces: consumes 16c to 16g
+   - verify: `uv run pytest -m "not live" tests/test_gate_wire.py` → all passed
+   - checks after 16i (single-agent fix mode): `uv run pytest -m "not live"` · `uv run ruff check` · `uv run ruff format --check`. Then the main session reruns the live gate and checks st-5 turn 2 shows `responses = 1` and no st-5 text appears in st-6.
 
 17b. *cuttable*: expected tool call match
    - files: `factory/gate/runner.py` (changed)
