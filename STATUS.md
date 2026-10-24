@@ -10,6 +10,7 @@ Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch
 - Review loop closed for both plans: `docs/plans/*.state.md`, `docs/plans/*.verify.md`, spec Traceability tables filled. Fixed: AC-29 barge-in counted only for a cancelled response; env read moved to the composition root; IHBench client wraps sends in close handling and bounds the close handshake.
 - P0 IHBench client (fork): `feat/higgs-realtime-client` at `abd6bd9`, tests at `0d73f72`; `54 passed` on websockets 17.3 and 12.0; footprint 3 files; both branches pushed to HlibHav/ihbench (draft PR HlibHav/ihbench#1).
 - Protocol: F2 settled (input_tokens includes cached tokens, probe `docs/evidence/probe-usage-20261024T165857Z.json`); F28 new (a cancelled response ends with one `response.done`, status `cancelled`). `scripts/smoke.py` now asserts the wire (usage present).
+- Glib's decisions 2026-10-24: composition root on the SDK allow-list (A1 closed); the websockets 12–13 redirect caveat is documented in the PR body; IHBench spec `Status: implemented`; branch merged into `main`.
 - Hand-off for Boson: `docs/BOSON-HANDOFF.md`. Demo runbook: `docs/DEMO-RUNBOOK.md`. Upstream PR body and command: `docs/ihbench-pr/` (not run).
 
 ## In progress
@@ -21,9 +22,6 @@ Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch
 - Record the demo (`docs/DEMO-RUNBOOK.md`).
 - "Push to Boson": `I_AM_GLIB_AND_SAID_PUSH_TO_BOSON=yes bash docs/ihbench-pr/create-pr.sh`.
 - Review the four template rubrics before any of them is shown.
-- Architecture finding A1: `factory/composition.py` imports `anthropic`/`httpx`, outside the plan's SDK allow-list.
-- IHBench finding 3: on websockets 12–13 a cross-host redirect would resend the bearer header.
-- Merge `chore/finalize-hackathon` into `main`.
 
 ## Next
 

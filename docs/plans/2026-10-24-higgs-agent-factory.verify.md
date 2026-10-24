@@ -121,7 +121,7 @@ Statuses: FIXED (closed in the working tree with a test), REFUTED, OPEN (real, n
 
 | # | severity | file:line | finding | status |
 |---|---|---|---|---|
-| A1 | must-close | factory/composition.py:16 | Imports `anthropic` and `httpx` and catches `anthropic.APIError` (:75); composition.py is not on the SDK allow-list at plan line 642 | NEEDS-GLIB. Option (a), recommended: add composition.py to the allow-list, move the `APIError` mapping into the adapters behind a port-level error such as `ModelCallFailed` in factory/ports.py (contract change). Option (b): move client construction into the adapters |
+| A1 | must-close | factory/composition.py:16 | Imports `anthropic` and `httpx` and catches `anthropic.APIError` (:75); composition.py is not on the SDK allow-list at plan line 642 | CLOSED by plan text: Glib (2026-10-24) put `factory/composition.py` on the SDK allow-list (plan Constraints and Checks for reviewers) |
 | A2 | must-close | factory/__main__.py:69 | CLI entry read `os.environ`; plan says env reads only in composition.py | FIXED. `__main__.py` no longer imports `os`; `build_app` takes `Mapping[str, str] \| None` and resolves `os.environ` itself. Test `test_cli_leaves_the_environment_read_to_the_composition_root` added (not run red-first) |
 | A3 | should (default heuristic) | factory/gate/tts_cache.py:64 | Service-layer disk I/O with no port; `run_gate` takes the concrete `TurnAudioSource`; `FactoryApp.store` typed `FileCardStore` though `CardStorePort` exists | OPEN. No project rule requires it; no action required |
 

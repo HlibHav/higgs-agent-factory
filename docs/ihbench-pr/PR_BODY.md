@@ -47,6 +47,10 @@ python scripts/run_inference_api.py \
 - **Judge numbers.** This PR claims no IHBench TF or RQ score for Higgs Realtime. Only inference was run, on 10 samples; `run_evaluate.py` was not run on the output.
 - **Audio output.** The client asks for text output only, which is what the judges read.
 
+## Known limitations
+
+- On `websockets` 12.x–13.x (legacy client, `extra_headers`), a cross-host HTTP redirect during the handshake would resend the `Authorization` header to the new host; 14+ strips it. `api.boson.ai` does not redirect today. Prefer `websockets>=14` when you can.
+
 ## Notes for reviewers
 
 - `max_workers` in YAML has no effect: a YAML value is applied only when the CLI arg is `None`, and `--max-workers` defaults to 8. That is why the command passes `--max-workers 1`. The Realtime concurrency limit is not documented, and going over it closes the socket with code 1013. This affects every config; I can send a separate fix.

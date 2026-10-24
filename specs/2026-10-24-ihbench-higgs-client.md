@@ -1,6 +1,6 @@
 # Spec: IHBench client for Higgs Realtime
 Spec ID: SPEC-2026-10-24-ihbench-higgs-client
-Status: approved
+Status: implemented
 Tier: Full SDD — scorecard 4/6 (raised by spec-creator from the main session's 3/6, Lightweight: Q2 became "yes" because a sample's multi-turn history can be replayed two ways)
 Supersedes: none
 Packages: the fork `../ihbench-higgs` of `boson-ai/ihbench`, branch `feat/higgs-realtime-client`, PR to `boson-ai/ihbench`. The spec lives in this repo. The code lives in the fork.
@@ -298,3 +298,4 @@ The red-first unit tests run against a fake WebSocket server and live on a separ
 | 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word because the editor change was not saved to disk. |
 | 2026-10-24 | Update mode, planner blocker. The smoke command gains `--max-workers 1`, and the YAML `max_workers` becomes documentation only. New ACs: AC-34 (zero-sample WAV fails), AC-35 (no temperature sent), AC-36 (cancelled response fails), AC-37 (auth per F23), AC-38 (whole allowed WebSocket library range). AC-4 now cites F24. AC-14 checks audio order and that no response starts early. AC-26 is proven by the main session. AC-10 and the edge cases note that the runner drops a turn's text when a WAV exists. All four open markers were closed. Status left as approved. | `sdd-engineering:implementation-planner` returned needs-answers: the runner ignores YAML `max_workers` (CLI default 8 wins) and drops the text of WAV turns. Glib answered the worker, empty-WAV, cancelled-response and protocol-fact questions, and the planner's defaults closed the open markers. The plan needs re-review. |
 | 2026-10-24 | traceability filled after review loop | Claude |
+| 2026-10-24 | Status set to implemented by Glib after the review loop (`docs/plans/2026-10-24-ihbench-higgs-client.verify.md`): no must-close; close handling and close timeout fixed in `abd6bd9`. | Glib, in chat. |
