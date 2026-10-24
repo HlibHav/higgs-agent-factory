@@ -20,6 +20,11 @@ Insert-only. Format and rules: `engineering-paved-path:engineering-insights` (`r
 - 2026-10-24: Skill-level grouping changed the outcome. The flat spec failed only st-6 (5/6), while the same policy split into skills failed st-2 and st-6 (4/6, run `20261024T174839Z-6f4ab3b5`). Compare cards across contract versions with care.
 - 2026-10-24: The coach overfits to the visible test. Its refund procedure quoted st-2's own "30 euros" example. Coach prompts see the failing transcript, so a released v2 proves the loop, not generalisation. Held-out scenarios per skill would test that.
 
+- 2026-10-24: No tool-using agent had been live-gated until a brief agent was. The first run hung forever after the mocked tool output: the server needs `response.create` (F29), and the runner waited for the follow-up with no timeout. Live-gate one template per code path (tools, interrupts) before calling a path done.
+
+- 2026-10-24: One run per scenario is noisy. On `brief-onboarding-buddy-b948ed`, book-call-slot-taken went PASS → FAIL between v1 and v2 although the coach had not touched its skill. The k = 2 judge only measures judge noise, not agent noise. Running each scenario n times (pass^n) would separate the two.
+- 2026-10-24: The coach page diff compares the latest card with its parent (v2 → v3), not with the first version. Read the chain of parent run ids for the full story.
+
 ## Tool & Library Notes
 
 - 2026-10-24: `AsyncAnthropic.messages.create` is overloaded; a Protocol member typed as a read-only property returning `Callable[..., Awaitable[Any]]` satisfies mypy, a plain `async def create(**kwargs)` does not.
