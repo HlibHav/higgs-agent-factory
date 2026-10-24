@@ -29,7 +29,7 @@ from factory.composition import CheckFailed, FactoryApp
 from factory.gate.diff import diff_cards
 from factory.gate.render import render_card_text
 from factory.live.session import EndReason, LiveSink, Sleep, run_live
-from factory.ports import Clock
+from factory.ports import AvatarError, AvatarPort, Clock
 
 DEFAULT_INDEX = Path(__file__).parent / "static" / "index.html"
 MIC_QUEUE_FRAMES = 100  # mic frames are dropped, never queued without bound
@@ -37,6 +37,7 @@ MIC_FRAME_MAX_BYTES = 32_768  # about 680 ms; a page sends 40 to 100 ms
 OUT_AUDIO_FRAMES = 100  # assistant audio waiting for the writer; the oldest is dropped
 WRITER_DRAIN_TIMEOUT_S = 5.0
 WS_POLICY_VIOLATION = 1008
+AVATAR_CLOSE_TIMEOUT_S = 10.0
 
 
 def _origin_ok(headers: Mapping[str, str]) -> bool:
@@ -158,6 +159,64 @@ class _WsSink:
         self._json({"type": "ended", "reason": reason, "message": message})
 
 
+class _AvatarSink:
+    """Sends assistant PCM to the avatar instead of the page. If the avatar fails mid-session,
+    audio goes to the page again, so live talk keeps working (avatar is optional)."""
+
+    def __init__(self, inner: LiveSink, avatar: AvatarPort, outbox: _Outbox) -> None:
+        self._inner = inner
+        self._avatar = avatar
+        self._outbox = outbox
+        self._up = True
+
+    async def _down(self) -> None:
+        self._up = False
+        self._outbox.put_text(json.dumps({"type": "avatar_off"}))
+
+    async def opened(self) -> None:
+        await self._inner.opened()
+
+    async def audio(self, pcm: bytes) -> None:
+        if self._up:
+            try:
+                await self._avatar.audio(pcm)
+                return
+            except AvatarError:
+                await self._down()
+        await self._inner.audio(pcm)
+
+    async def stop_playback(self, response_id: str | None) -> None:
+        if self._up:
+            try:
+                await self._avatar.clear()
+            except Exception:  # noqa: BLE001
+                await self._down()
+        await self._inner.stop_playback(response_id)
+
+    async def ttfa(self, ms: float, label: str) -> None:
+        await self._inner.ttfa(ms, label)
+
+    async def transcript(self, text: str) -> None:
+        if self._up:
+            try:
+                await self._avatar.flush()  # the response is over: close the audio stream
+            except Exception:  # noqa: BLE001
+                await self._down()
+        await self._inner.transcript(text)
+
+    async def ended(self, reason: EndReason, message: str) -> None:
+        await self._inner.ended(reason, message)
+
+
+async def _close_avatar(avatar: AvatarPort | None) -> None:
+    if avatar is None:
+        return
+    try:
+        await asyncio.wait_for(asyncio.shield(avatar.close()), AVATAR_CLOSE_TIMEOUT_S)
+    except Exception:  # noqa: BLE001 - the session also ends at expires_at (F11)
+        pass
+
+
 async def _write(ws: WebSocket, outbox: _Outbox, inbox: _Inbox) -> None:
     """The only task that sends on the socket."""
     try:
@@ -221,10 +280,17 @@ def create_web_app(
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
+        await drop_pending()
         await factory_app.aclose()
 
     app = FastAPI(title="Higgs Agent Factory", lifespan=lifespan, docs_url=None, redoc_url=None)
     live_running = False
+    pending_avatar: AvatarPort | None = None  # created by POST, claimed by the live WebSocket
+
+    async def drop_pending() -> None:
+        nonlocal pending_avatar
+        stale, pending_avatar = pending_avatar, None
+        await _close_avatar(stale)
 
     @app.middleware("http")
     async def guard(request: Request, call_next: Any) -> Response:
@@ -326,9 +392,35 @@ def create_web_app(
             "stored_verdict": result.stored_verdict,
         }
 
+    @app.post("/api/avatar/session")
+    async def avatar_session() -> dict[str, str]:
+        """Optional avatar: create the room session; return only what the browser may hold."""
+        nonlocal pending_avatar
+        if factory_app.avatar is None:
+            raise HTTPException(503, "The avatar is not configured.")
+        await drop_pending()  # one avatar at a time; an unclaimed one is released
+        try:
+            pending_avatar = await factory_app.avatar()
+        except AvatarError as exc:
+            raise HTTPException(502, str(exc)) from None
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(502, f"The avatar failed ({type(exc).__name__}).") from None
+        i = pending_avatar.info
+        return {
+            "url": i.url,
+            "room": i.room,
+            "viewer_token": i.viewer_token,
+            "avatar_identity": i.avatar_identity,
+        }
+
+    @app.delete("/api/avatar/session")
+    async def avatar_release() -> dict[str, bool]:
+        await drop_pending()
+        return {"ok": True}
+
     @app.websocket("/ws/live/{agent_id}")
     async def live(ws: WebSocket, agent_id: str) -> None:
-        nonlocal live_running
+        nonlocal live_running, pending_avatar
         if not _origin_ok(ws.headers):
             await ws.close(code=WS_POLICY_VIOLATION)
             return
@@ -339,6 +431,12 @@ def create_web_app(
             await _reject(ws, _plain_ended("error", message))
             return
         live_running = True
+        avatar: AvatarPort | None = None
+        wanted = ws.query_params.get("avatar")
+        if pending_avatar is not None and wanted == pending_avatar.info.room:
+            avatar, pending_avatar = pending_avatar, None
+        else:
+            await drop_pending()  # a toggle that was switched off: release a stale session
         try:
             card = factory_app.latest_card(agent_id)
             ready = {
@@ -348,9 +446,10 @@ def create_web_app(
                 "run_id": None if card is None else card.run_id,
                 "limit_s": int(found.budget.max_live_session_s),
             }
-            await _serve(ws, found, ready, factory_app, clock, sleep)
+            await _serve(ws, found, ready, factory_app, clock, sleep, avatar)
         finally:
             live_running = False
+            await _close_avatar(avatar)
 
     return app
 
@@ -370,9 +469,12 @@ async def _serve(
     factory_app: FactoryApp,
     clock: Clock,
     sleep: Sleep,
+    avatar: AvatarPort | None = None,
 ) -> None:
     outbox, inbox = _Outbox(), _Inbox()
     sink: LiveSink = _WsSink(outbox, ready)
+    if avatar is not None:
+        sink = _AvatarSink(sink, avatar, outbox)
     writer = asyncio.create_task(_write(ws, outbox, inbox))
     reader = asyncio.create_task(_read(ws, inbox))
     try:

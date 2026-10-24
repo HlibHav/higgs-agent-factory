@@ -4,7 +4,7 @@ No vendor SDK is imported here. Adapters implement these; tests use doubles.
 """
 
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol
@@ -158,3 +158,43 @@ class CardStorePort(Protocol):
     def save(self, card: "EvalCard") -> Path: ...
 
     def latest(self, agent_id: str) -> "EvalCard | None": ...
+
+
+class AvatarError(Exception):
+    """The avatar could not start or stay up. The message is safe to show: no keys, no tokens."""
+
+
+@dataclass(frozen=True)
+class AvatarInfo:
+    """What the browser may know: where the room is and a subscribe-only, short-lived token."""
+
+    url: str
+    room: str
+    viewer_token: str
+    avatar_identity: str
+
+
+class AvatarPort(Protocol):
+    """One realtime avatar session (F11): assistant PCM in, video and audio out through a room."""
+
+    @property
+    def info(self) -> AvatarInfo: ...
+
+    async def audio(self, pcm: bytes) -> None:
+        """24 kHz s16le mono assistant PCM (F11). Raises `AvatarError` when the avatar is down."""
+        ...
+
+    async def clear(self) -> None:
+        """Barge-in: drop what the avatar has not yet spoken."""
+        ...
+
+    async def flush(self) -> None:
+        """End of one assistant response: close the audio stream."""
+        ...
+
+    async def close(self) -> None:
+        """End the avatar session and leave the room; never raises."""
+        ...
+
+
+AvatarFactory = Callable[[], Awaitable[AvatarPort]]

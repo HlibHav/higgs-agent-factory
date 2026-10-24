@@ -37,6 +37,7 @@ from factory.gate.tts_cache import TurnAudioSource
 from factory.live.session import LiveAudioDelta
 from factory.ports import (
     AudioDelta,
+    AvatarFactory,
     BriefModel,
     CoachModel,
     JudgePort,
@@ -51,6 +52,7 @@ BOSON_API_BASE_URL = "https://api.boson.ai"  # F22
 DEFAULT_JUDGE_MODEL = "claude-sonnet-5-5"  # ADR 2026-10-24-anthropic-sonnet-for-judge-and-generator
 TEMPLATE_RECORDINGS_DIR = Path(__file__).parent / "agent_spec" / "templates" / "recordings"
 TTS_TIMEOUT_S = 60.0
+AVATAR_MAX_DURATION_S = 600  # F11: ends at expires_at even if we never delete it
 
 
 _ACRONYMS = {"ai": "AI"}
@@ -118,6 +120,7 @@ class FactoryApp:
     coach_model: CoachModel | None = None
     last_path: Path | None = None
     live_sessions: SessionFactory | None = None  # live pages need PCM in the audio deltas
+    avatar: AvatarFactory | None = None  # None: avatar not configured (LIVEKIT_* unset)
     _closers: tuple[Callable[[], Awaitable[None]], ...] = ()
 
     async def run_gate_for_template(
@@ -325,6 +328,19 @@ def _api_error(exc: anthropic.APIError) -> str:
     return f"{type(exc).__name__}, status {status}" if status else type(exc).__name__
 
 
+def _avatar_factory(env: Mapping[str, str], boson_key: str) -> AvatarFactory | None:
+    """The avatar is optional: without all three LIVEKIT_* values the page has no avatar."""
+    url = env.get("LIVEKIT_URL", "").strip()
+    key = env.get("LIVEKIT_API_KEY", "").strip()
+    secret = env.get("LIVEKIT_API_SECRET", "").strip()
+    if not (url and key and secret):
+        return None
+    from factory.live.avatar_livekit import LiveKitConfig, start_avatar  # lazy: demo works without
+
+    config = LiveKitConfig(url, key, secret)
+    return lambda: start_avatar(boson_key, config, AVATAR_MAX_DURATION_S)
+
+
 def build_app(env: Mapping[str, str] | None, results_dir: Path) -> FactoryApp:
     """Fails with `ConfigError` before any network call when a key is missing."""
     env = os.environ if env is None else env
@@ -332,11 +348,13 @@ def build_app(env: Mapping[str, str] | None, results_dir: Path) -> FactoryApp:
     anthropic_key = _required(env, "ANTHROPIC_API_KEY")
     judge_model = env.get("FACTORY_JUDGE_MODEL", "").strip() or DEFAULT_JUDGE_MODEL
 
+    avatar = _avatar_factory(env, boson_key)
     http = httpx.AsyncClient(base_url=BOSON_API_BASE_URL, timeout=TTS_TIMEOUT_S)
     llm = anthropic.AsyncAnthropic(api_key=anthropic_key, max_retries=0)  # NFR: no retries
     return FactoryApp(
         sessions=lambda: BosonRealtimeSession(BOSON_REALTIME_URL, boson_key, time.monotonic),
         live_sessions=lambda: LiveBosonSession(BOSON_REALTIME_URL, boson_key, time.monotonic),
+        avatar=avatar,
         audio=TurnAudioSource(
             BosonTts(http, boson_key), results_dir / "tts-cache", TEMPLATE_RECORDINGS_DIR
         ),

@@ -170,8 +170,10 @@
       <button id="stopBtn" class="btn stop" type="button" disabled>Stop</button>
       <span class="timer" id="timer">00:00 / --:--</span>
       <span class="muted">Mic</span><div class="meter" aria-hidden="true"><div id="meterBar"></div></div>
+      <label class="hint"><input type="checkbox" id="avatarToggle"> Avatar (optional)</label>
       <span class="hint">Use headphones: the agent's own voice would otherwise interrupt it.</span>
     </div>
+    <div id="avatarBox" hidden><video id="avatarVideo" autoplay playsinline style="width:240px;height:320px;background:#000;border-radius:8px"></video></div>
     <p id="notReleased" class="banner" hidden>NOT RELEASED: this agent's latest gate verdict is not "released".</p>
     <p id="liveStatus" class="status" aria-live="polite">Pick a template, then press Start.</p>
     <div class="cols">
@@ -188,6 +190,7 @@
   </section>
 </main>
 
+<script src="https://unpkg.com/livekit-client@2.15.0/dist/livekit-client.umd.js"></script>
 <script>
 "use strict";
 (() => {
@@ -669,6 +672,34 @@ registerProcessor("pcm16-sender", Pcm16Sender);
     loop();
   }
 
+  // Optional avatar: any failure returns null and live talk continues audio-only.
+  async function startAvatar() {
+    try {
+      if (typeof LivekitClient === "undefined") throw new Error("livekit-client not loaded");
+      const r = await fetch("/api/avatar/session", { method: "POST" });
+      if (!r.ok) throw new Error("avatar " + r.status);
+      const a = await r.json();
+      const room = new LivekitClient.Room();
+      room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        if (participant.identity !== a.avatar_identity) return;
+        if (track.kind === "video") {
+          track.attach($("avatarVideo"));
+          $("avatarBox").hidden = false;
+        } else if (track.kind === "audio") {
+          const el = track.attach();
+          $("avatarBox").appendChild(el);
+          el.play().catch(() => {});
+        }
+      });
+      await room.connect(a.url, a.viewer_token);
+      return { room, name: a.room };
+    } catch (e) {
+      fetch("/api/avatar/session", { method: "DELETE" }).catch(() => {});
+      setLiveStatus("Avatar unavailable; continuing with audio only.", true);
+      return null;
+    }
+  }
+
   async function startLive() {
     if (live || !selected) return;
     // AudioContext first, inside the click (user gesture), before any await.
@@ -733,8 +764,20 @@ registerProcessor("pcm16-sender", Pcm16Sender);
     startMeter();
 
     setLiveStatus("Connecting to the agent…");
+    let avatar = null;
+    if ($("avatarToggle").checked) {
+      setLiveStatus("Starting the avatar…");
+      avatar = await startAvatar();
+      if (!live || live.ctx !== ctx) {
+        if (avatar) { try { avatar.room.disconnect(); } catch (_) { /* gone */ } }
+        fetch("/api/avatar/session", { method: "DELETE" }).catch(() => {});
+        return;
+      }
+      live.avatar = avatar;
+    }
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const ws = new WebSocket(proto + "//" + location.host + "/ws/live/" + encodeURIComponent(sel.agentId));
+    const ws = new WebSocket(proto + "//" + location.host + "/ws/live/" + encodeURIComponent(sel.agentId) +
+      (avatar ? "?avatar=" + encodeURIComponent(avatar.name) : ""));
     ws.binaryType = "arraybuffer";
     live.ws = ws;
     node.port.onmessage = (e) => {
@@ -777,6 +820,9 @@ registerProcessor("pcm16-sender", Pcm16Sender);
       case "ttfa":
         addTtfa(m.ms, m.label);
         setLiveStatus("Agent speaking. Talk over it to interrupt.");
+        break;
+      case "avatar_off":
+        setLiveStatus("Avatar stopped; the agent's voice plays here instead.", true);
         break;
       case "transcript":
         if (typeof m.text === "string" && m.text) addTranscript(m.text);
@@ -858,6 +904,13 @@ registerProcessor("pcm16-sender", Pcm16Sender);
       if (l.ws.readyState === WebSocket.OPEN || l.ws.readyState === WebSocket.CONNECTING) {
         try { l.ws.close(1000); } catch (_) { /* gone */ }
       }
+    }
+    if (l.avatar) {
+      try { l.avatar.room.disconnect(); } catch (_) { /* gone */ }
+      $("avatarBox").hidden = true;
+      $("avatarVideo").srcObject = null;
+      for (const a of $("avatarBox").querySelectorAll("audio")) a.remove();
+      fetch("/api/avatar/session", { method: "DELETE" }).catch(() => {}); // frees an unclaimed one
     }
     if (l.ctx && l.ctx.state !== "closed") l.ctx.close().catch(() => {});
     $("notReleased").hidden = true;

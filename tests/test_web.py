@@ -38,6 +38,7 @@ from factory.ports import (
 from factory.web.app import _Inbox, _Outbox, create_web_app
 from tests.doubles import (
     Delay,
+    FakeAvatarFactory,
     FakeBriefModel,
     FakeJudge,
     FakeSessionFactory,
@@ -56,6 +57,8 @@ from tests.fake_realtime_server import (
 )
 
 BOSON_KEY = "sk-test-BOSON-xyz"
+LIVEKIT_KEY = "lk-test-KEY-xyz"
+LIVEKIT_SECRET = "lk-test-SECRET-xyz"
 ANTHROPIC_KEY = "sk-test-ANTH-xyz"
 AGENT = "specialist-training"
 GOOD = json.dumps({"label": "PASS", "rationale": "answered", "evidence": "Hello"})
@@ -502,8 +505,16 @@ def test_error_text_escaped(tmp_path: Path) -> None:
 
 
 def test_ac37_no_key_in_any_response_or_message(tmp_path: Path) -> None:
-    env = {"BOSON_API_KEY": BOSON_KEY, "ANTHROPIC_API_KEY": ANTHROPIC_KEY}
+    env = {
+        "BOSON_API_KEY": BOSON_KEY,
+        "ANTHROPIC_API_KEY": ANTHROPIC_KEY,
+        "LIVEKIT_URL": "wss://x.livekit.cloud",
+        "LIVEKIT_API_KEY": LIVEKIT_KEY,
+        "LIVEKIT_API_SECRET": LIVEKIT_SECRET,
+    }
     built = build_app(env, tmp_path / "results")
+    assert built.avatar is not None  # configured from env; replaced by a double below
+    built.avatar = FakeAvatarFactory()
     page = tmp_path / "index.html"
     page.write_text("<h1>demo</h1>", encoding="utf-8")
     _store_card(tmp_path / "results", AGENT, "FAIL")
@@ -530,12 +541,17 @@ def test_ac37_no_key_in_any_response_or_message(tmp_path: Path) -> None:
     bodies.append(client.post("/api/brief", json={"brief": "a trainer"}).text)
     bodies.append(client.post("/api/brief", json={"brief": "x" * 1001}).text)
     bodies.append(client.post(f"/api/agents/{AGENT}/scenarios/nope/check").text)
+    avatar_reply = client.post("/api/avatar/session")
+    assert avatar_reply.status_code == 200
+    bodies.append(avatar_reply.text)
+    bodies.append(client.delete("/api/avatar/session").text)
     with client.websocket_connect(f"/ws/live/{AGENT}") as ws:
         for frame in _receive_until_end(ws):
             bodies.append(frame.hex() if isinstance(frame, bytes) else json.dumps(frame))
     assert len(bodies) > 8
     for body in bodies:
         assert BOSON_KEY not in body and ANTHROPIC_KEY not in body
+        assert LIVEKIT_SECRET not in body and LIVEKIT_KEY not in body
     for headers in (client.get("/api/templates").headers, client.get("/").headers):
         assert BOSON_KEY not in str(dict(headers)) and ANTHROPIC_KEY not in str(dict(headers))
 
