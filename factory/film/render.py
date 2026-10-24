@@ -246,8 +246,10 @@ def _parse_loudnorm(stderr: str) -> dict[str, str]:
 
 
 def _concat_list(parts: list[Path], list_file: Path) -> None:
+    # Absolute entries: the concat demuxer resolves a relative one against the list's folder.
     lines = [
-        f"file '{str(p).replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'" for p in parts
+        f"file '{str(p.resolve()).replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'"
+        for p in parts
     ]
     list_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

@@ -382,3 +382,16 @@ def test_concat_list_escapes_single_quotes(tmp_path: Path) -> None:
     list_file = tmp_path / "l.txt"
     _concat_list([tmp_path / "it's.mp4"], list_file)
     assert "'\\''" in list_file.read_text()
+
+
+def test_concat_list_entries_are_absolute(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # ffmpeg's concat demuxer resolves a relative entry against the list file's folder,
+    # so a relative run dir doubled the path on the first real render.
+    monkeypatch.chdir(tmp_path)
+    work = Path("runs/r1/render-work")
+    work.mkdir(parents=True)
+    list_file = work / "segments.txt"
+    _concat_list([work / "00-hook.mp4"], list_file)
+    entry = list_file.read_text().strip().removeprefix("file '").removesuffix("'")
+    assert Path(entry).is_absolute()
+    assert Path(entry) == (tmp_path / work / "00-hook.mp4").resolve()
