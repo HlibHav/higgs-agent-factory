@@ -1,6 +1,6 @@
 # Spec: Higgs Agent Factory
 Spec ID: SPEC-2026-10-24-higgs-agent-factory
-Status: draft
+Status: approved
 Tier: Full SDD — scorecard 6/6 (main session 6/6, re-scored by spec-creator 6/6)
 Supersedes: none
 Packages: root (single-package repo)
@@ -540,3 +540,4 @@ Training is the P1 template and carries the AC-5 budget.
 |---|---|---|
 | 2026-10-24 | Created as draft (Full SDD). Folds in Glib's answers: gate = every scenario PASS, RQ/TTFA/barge-in informational, cut-short run `incomplete` (Q1); user turns via Higgs TTS 3 with recordings as fallback (Q2, F22); budget limits required in the Agent Spec with Specialist Training defaults and a 1,000-character brief cap (Q3); estimated-audio-cost framing with token cost "not measurable (F2)"; judge vendor Anthropic. | create → answers mode, spec-creator |
 | 2026-10-24 | Cost: measured token cost (AC-50) is the headline when every response reported usage, audio estimate stays a separate line (AC-51); AC-31 now applies only when some response lacked usage; non-goal and NFR wording that called token cost never measurable removed. AC-36: live talk with a non-released agent allowed with a "not released" label. Demo step 2: stored full card plus one live scenario (AC-52, AC-53). Two markers closed, one added (cached-token counting). | Live smoke `results/smoke-20261024T145225Z.jsonl` showed `usage` populated on a text-mode `response.done` (F2 docs vs wire); Glib's answers on cost, AC-36 and demo timing. update mode |
+| 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word. |
