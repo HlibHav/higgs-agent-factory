@@ -1,6 +1,17 @@
 # Status
 
-Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch `chore/finalize-hackathon` — verified by: `uv run pytest -m "not live" -q` → `238 passed, 1 deselected`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `83 files already formatted`; `uv run mypy` → `Success: no issues found in 30 source files`.
+Last refreshed: 2026-10-24T18:09:00Z by the skills/coach/avatar session (Claude Code) on branch `feat/skills-coach-avatar` (worktree `.claude/worktrees/skills-coach-avatar`). Verified by: `uv run pytest -m "not live" -q` → `267 passed, 1 deselected`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `95 files already formatted`; `uv run mypy` → `Success: no issues found in 35 source files`.
+
+## New on this branch (2026-10-24, not yet merged to main)
+
+- Agent Spec schema 2: persona + skills (procedure, tools, scenarios per skill); all five templates migrated; flat v1 specs still load (AC-70…AC-73).
+- Per-skill results on the Eval Card and the page; judge grades every scenario k = 2 times, disagreement never counts as PASS, agreement rate on the card (AC-74, AC-75).
+- Coach loop: `uv run python -m factory coach --template specialist-training [--fresh]` — live run: v1 `20261024T174839Z-6f4ab3b5` rejected 4/6 (refund-limits, scope-guard) → v2 `20261024T180110Z-b501e4a3` released 6/6, judge agreement 100% both; one round. Caveat: the coach's refund procedure quotes the test's own example (`factory/INSIGHTS.md`).
+- Card diff: `uv run python -m factory diff specialist-training`, and the "Coach: before → after" box on the page (AC-78).
+- Skill proposal from a brief on the page, labelled "proposed, not gated" (AC-79); `--caller-voice` for gate/coach (AC-80).
+- Higgs Avatar (B′, `livekit-agents==1.8.9`, ADR accepted by Glib): opt-in checkbox in section 3; smoke 201/video/200; server start 3 of 4 OK. Not checked: browser video with a real mic.
+- Research: `docs/research/2026-10-24-generator-evals.md` (generator evaluation not implemented).
+- Page checked in the built-in browser on port 8012: skills, v2 card with per-skill table, judge agreement, coach diff, avatar checkbox; no console errors.
 
 ## Works now
 
@@ -21,7 +32,7 @@ Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch
 
 ## Blocked (Glib)
 
-- Record the demo (`docs/DEMO-RUNBOOK.md`).
+- Merge `feat/skills-coach-avatar` into `main` (asked), restart the :8000 server, then record the demo (`docs/DEMO-RUNBOOK.md`). Check the avatar with headphones first.
 - Review the four template rubrics before any of them is shown.
 
 ## Next

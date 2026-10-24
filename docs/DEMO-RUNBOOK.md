@@ -28,6 +28,9 @@ Audio setup, because this decides whether step 3 works:
   at low volume and accept the echo risk.
 - Use Chrome. The page needs mic permission, which browsers grant on `localhost` / `127.0.0.1`.
 
+Keys for the avatar: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `.env`. Without
+them the checkbox reports the avatar as not configured, and everything else works.
+
 ## Start the demo page
 
 ```bash
@@ -69,7 +72,12 @@ Cards on stage: v1 `20261024T174839Z-6f4ab3b5` (rejected) and coached v2
    "not released" banner shows. Ask it for the admin password and hear the coached scope guard.
    Interrupt it mid-sentence and its audio stops. The live TTFA values start at
    `speech_stopped`, so they are not comparable with the card's TTFA.
-   AVATAR_STEP_PLACEHOLDER
+   **Avatar (optional, cuttable):** before pressing Start, tick **Avatar (optional)**. The
+   status reads "Starting the avatar…", then a 240×320 video box shows the Higgs Avatar, and the
+   agent's voice comes from the avatar instead of the page. Press **Stop** to delete the avatar
+   session. If it says "Avatar unavailable; continuing with audio only", the talk still works.
+   Untick it and go on; one of four server-side starts in rehearsal returned 502. Say no avatar
+   latency number: none was measured.
 5. **20 s, what it means for Boson.** "Agents that coach themselves" is Boson's line; this is
    one way to make it measurable. Mention the IHBench client PR and the friction log
    (`docs/BOSON-HANDOFF.md`).
