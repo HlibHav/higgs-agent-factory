@@ -1,0 +1,149 @@
+"""Ports: what the gate needs from the outside world, plus the domain events it consumes.
+
+No vendor SDK is imported here. Adapters implement these; tests use doubles.
+"""
+
+import time
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal, Protocol
+
+from factory.agent_spec.models import AgentSpec, Rubric
+
+if TYPE_CHECKING:
+    from factory.gate.records import EvalCard
+
+Clock = Callable[[], float]
+DEFAULT_CLOCK: Clock = time.monotonic
+
+
+@dataclass(frozen=True)
+class Usage:
+    input_tokens: int
+    cached_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True)
+class AudioDelta:
+    response_id: str
+    nbytes: int
+    t: float
+
+
+@dataclass(frozen=True)
+class TranscriptDelta:
+    response_id: str
+    text: str
+    t: float
+
+
+@dataclass(frozen=True)
+class ResponseDone:
+    response_id: str
+    status: str
+    usage: Usage | None
+    t: float
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    call_id: str
+    name: str
+    arguments: dict[str, Any]
+    executor: Literal["client", "server"]
+    t: float
+
+
+@dataclass(frozen=True)
+class SpeechStarted:
+    t: float
+
+
+@dataclass(frozen=True)
+class SpeechStopped:
+    t: float
+
+
+@dataclass(frozen=True)
+class SessionEnded:
+    cause: Literal["quota refused", "idle timeout", "concurrency limit", "closed"]
+    close_code: int | None
+    error_text: str | None
+    t: float
+
+
+@dataclass(frozen=True)
+class OtherEvent:
+    type: str
+    t: float
+
+
+SessionEvent = (
+    AudioDelta
+    | TranscriptDelta
+    | ResponseDone
+    | ToolCall
+    | SpeechStarted
+    | SpeechStopped
+    | SessionEnded
+    | OtherEvent
+)
+
+
+class SessionRefused(Exception):
+    """The server refused the session configuration (F7, F14)."""
+
+    def __init__(self, error_text: str) -> None:
+        super().__init__(error_text)
+        self.error_text = error_text
+
+
+class TtsError(Exception):
+    """Text-to-speech synthesis failed."""
+
+
+class RealtimeSession(Protocol):
+    async def open(self, spec: AgentSpec) -> None: ...
+
+    async def send_audio(self, pcm: bytes) -> float:
+        """Send one input_audio_buffer.append; returns the monotonic send time."""
+        ...
+
+    async def send_tool_output(self, call_id: str, output: str) -> None: ...
+
+    def events(self) -> AsyncIterator[SessionEvent]: ...
+
+    async def close(self) -> None: ...
+
+
+SessionFactory = Callable[[], RealtimeSession]
+
+
+class TtsPort(Protocol):
+    async def synthesise(self, text: str, voice: str) -> bytes:
+        """24 kHz s16le mono PCM (F22). Raises `TtsError`."""
+        ...
+
+
+@dataclass(frozen=True)
+class JudgeRequest:
+    rubric: Rubric
+    user_turns: list[str]
+    transcript: str
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+
+class JudgePort(Protocol):
+    async def judge(self, request: JudgeRequest) -> str: ...
+
+
+class BriefModel(Protocol):
+    async def draft_spec(self, brief: str) -> str: ...
+
+
+class CardStorePort(Protocol):
+    def save(self, card: "EvalCard") -> Path: ...
+
+    def latest(self, agent_id: str) -> "EvalCard | None": ...
