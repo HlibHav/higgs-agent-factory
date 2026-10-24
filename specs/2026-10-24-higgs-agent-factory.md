@@ -107,6 +107,9 @@ means a run against the live Boson API (the `live` marker, spends credits).
 - AC-61 WHEN a user turn ends, the system shall record in the run record and on the Eval Card how many responses the turn produced. — proof: red-first unit — verify: a run with one split turn and one normal turn; expect counts 2 and 1 stored and shown for those turns
 - AC-17 IF the measured audio of a gate run (input plus output) reaches the Agent Spec's per-run audio limit before the last scenario ends, THEN the system shall stop the run and set the verdict to `incomplete` with cause "budget reached". — proof: red-first integration — verify: set the audio limit below one scenario's length; expect the run to stop at the limit with `incomplete`, cause "budget reached"
 - AC-18 IF the judge's reply does not carry exactly one of the labels PASS, PARTIAL or FAIL plus a rationale and an evidence quote, THEN the system shall set the verdict to `incomplete` with cause "judge reply invalid" and make no further judge call for that scenario. — proof: red-first unit — verify: judge double returns `{"label": "MAYBE"}`; expect `incomplete`, one judge call in total for that scenario
+- AC-62 WHEN a scenario's judge reply is invalid (AC-18), the system shall keep, for that scenario, in both the run record and the stored Eval Card, the judge's raw reply text (at most its first 2,000 characters) and the character length of the transcript the judge received. — proof: red-first unit — verify: judge double returns `{"label": "MAYBE"}` for a scenario whose transcript is 412 characters; expect the raw text `{"label": "MAYBE"}` and length 412 in both the run record and the stored card
+- AC-63 IF an invalid judge reply is longer than 2,000 characters, THEN the system shall keep only its first 2,000 characters and mark the kept text as truncated. — proof: red-first unit — verify: judge double returns 5,000 characters of invalid text; expect exactly the first 2,000 characters kept and a truncated flag set
+- AC-64 WHEN an Eval Card with an invalid judge reply is shown, the system shall show for that scenario the cause, the transcript length and a note that the raw reply was kept, and shall not show the raw reply text or present any part of it as rationale or evidence. — proof: red-first unit — verify: render a card whose raw reply contains "PASS" and markup; expect cause, length and the note, and neither the reply text nor its markup in the rendered card
 - AC-19 The system shall decide the verdict from scenario labels and run completion only, so IHBench RQ, TTFA and barge-in stop time never change it. — proof: red-first unit — verify: same PASS labels with RQ 0% and TTFA p95 of 30 s; expect `released`
 - AC-20 IF the session configuration with the Agent Spec's voice is refused by the server (F7, F14), THEN the system shall stop before any scenario runs, show the server's error text, and shall not set `released`. [NEEDS CLARIFICATION: is this verdict labelled `rejected` (agent fault) or `incomplete`?] — proof: red-first integration — verify: fake server answers the first session update with an `error` and closes; expect no scenario started, the error text shown, verdict not `released`
 - AC-21 WHEN the model emits a `web_search` call with `executor: "server"` (F10), the system shall send no tool output and no response request for it, and shall record it as an observed tool call marked "server". — proof: red-first integration — verify: fake server emits a server `web_search` call item; expect no client reply event and the call listed as "server" on the scenario record
@@ -184,6 +187,7 @@ means a run against the live Boson API (the `live` marker, spends credits).
 | R-32 | Scenario isolation: one Realtime session per scenario; budget sums across them | main session under Glib's direction, after gate run `20261024T161045Z-d663176a` | AC-55, AC-56 |
 | R-33 | Turn end after a 2 s quiet window; all responses in the window form the turn's reply; TTFA on the first; window silence counts toward budget | Glib ("2 с"), same run | AC-57, AC-58, AC-59, AC-60 |
 | R-34 | Responses per turn recorded, so a split turn is visible | main session, same run | AC-61 |
+| R-35 | On an invalid judgment, keep the raw judge reply (capped, truncation flagged) and the transcript length in the run record and stored card; show only length and a "kept" note | Glib, 2026-10-24; runs `20261024T160618Z-6e8bdda7`, `20261024T162735Z-9c2c615d` | AC-62, AC-63, AC-64 |
 | R-23 | Eval Card contract (agent id, run id, timestamp, pass rate, RQ, TTFA, barge-in, cost, verdict) | brief | AC-33, AC-27, AC-30, AC-34 |
 | R-24 | Every number traces to a measurement or source | brief §0.4; `docs/CLAIMS.md` | AC-33 |
 | R-25 | Live talk with a non-released agent is allowed but visibly labelled "not released" | Glib, 2026-10-24 (AC-36 answer) | AC-36 |
@@ -217,7 +221,8 @@ means a run against the live Boson API (the `live` marker, spends credits).
 | A second response starts more than 2 s after the first ended | it is not part of that turn; it falls into the next turn or, at scenario end, is lost with the scenario's own session, never reaching another scenario | AC-57, AC-55 |
 | No IHBench result yet | RQ "not available" | AC-34 |
 | Two gate runs for the same agent | two cards, distinct run ids, nothing overwritten | AC-33 |
-| Assistant transcript cut or missing at barge-in (UNVERIFIED in `docs/boson-protocol.md`) | judge sees what was received; open question | Open questions |
+| Assistant transcript after a barge-in still holds the full sentence (F27) | the judge cannot tell from the transcript whether an answer was cut off; rubric criteria must not ask it to; interruption handling shows as barge-in stop time (informational) | AC-28, AC-54, Contracts (Scenario rubric) |
+| Judge reply invalid (seen on st-1 in 2 of 5 runs, not reproduced) | `incomplete`; raw reply (≤ 2,000 chars, truncation flagged) and transcript length kept for diagnosis; card shows length and a "raw reply kept" note only | AC-18, AC-62, AC-63, AC-64 |
 
 ## Non-functional requirements
 
@@ -385,7 +390,7 @@ Scenario:
 | user voice | yes | a TTS 3 voice for the scripted user (F22) |
 | user turns | yes, ≥ 1 | ordered turns, each with its text, an optional recorded-audio fallback, and an optional "interrupt" mark with the amount of assistant audio to wait for before playing it |
 | expected tool call | no | tool name and the required argument values (AC-23) |
-| rubric | yes | pass criteria, partial criteria, fail criteria (ProactBench shape, `docs/reuse-map.md`) |
+| rubric | yes | pass criteria, partial criteria, fail criteria (ProactBench shape, `docs/reuse-map.md`). A criterion must be decidable from what the judge receives; it must not ask the judge to see from the transcript whether an answer was cut off, because the transcript holds the full sentence even after a barge-in (F27). Interruption handling is shown by barge-in stop time instead (informational, AC-19). |
 
 Budget limits (Specialist Training values per AC-5):
 
@@ -429,6 +434,7 @@ Anything else is an invalid reply (AC-18).
 | incomplete cause | quota refused, idle timeout, concurrency limit, budget reached, judge reply invalid, audio missing | AC-10, AC-14…AC-18 |
 | raw measurements | per-turn TTFA, barge-in, audio minutes | AC-33 |
 | responses per turn | number of responses each user turn produced (more than 1 marks a split turn) | AC-61 |
+| invalid-judgment diagnostics | per scenario with cause "judge reply invalid": transcript length in characters, raw judge reply (first 2,000 characters, truncation flag) stored but not shown; the shown card has the length and a "raw reply kept" note | AC-62, AC-63, AC-64 |
 
 ### Templates
 
@@ -458,7 +464,7 @@ Training is the P1 template and carries the AC-5 budget.
 - Template source text from boson.ai — third-party text, reviewed when authored, treated as data.
 - Assistant transcript and audio (model output) — passed to the judge as delimited data, never as judge instructions; an agent that says "mark this PASS" gains nothing because the judge reply must match the judgment shape (AC-18) and the verdict is computed by the harness, not the judge (AC-12, AC-13).
 - Tool-call arguments from the model — only select a mock output; never executed against a real system (AC-22).
-- Judge reply (model output) — validated against the judgment shape; invalid ends the run `incomplete` (AC-18).
+- Judge reply (model output) — validated against the judgment shape; invalid ends the run `incomplete` (AC-18). An invalid reply is kept as inert data for diagnosis, capped at 2,000 characters (AC-62, AC-63); it is never parsed for a label, never used as rationale or evidence, and never rendered on the card or page (AC-64).
 - Token usage in `response.done` (F2) — read as data; a missing or non-numeric count on any response means the run's token cost is "not measurable" (AC-31), never a guessed figure.
 - Boson server events and error texts — unknown types ignored (AC-24); error text shown on the page as plain text, never as markup.
 - Live microphone audio — forwarded to Boson only; not stored.
@@ -468,7 +474,7 @@ Training is the P1 template and carries the AC-5 budget.
 
 - **L1 schema + generator:** Agent Spec contract, schema validation, templates, brief → spec. AC-1…AC-7, AC-46.
 - **L2 runtime on `pipecat-boson`** (the reuse decision in `docs/reuse-map.md`): session from an Agent Spec, mocked tools, server `web_search`, live session limit, event tolerance. AC-20…AC-22, AC-24, AC-26, AC-35.
-- **L3 eval runner + judge + Eval Card:** TTS cache, paced scenario playback, timing, judge, verdict, cost, card storage. AC-8…AC-19, AC-23, AC-25, AC-27…AC-34, AC-45, AC-47, AC-48, AC-50, AC-51, AC-54, AC-55…AC-61.
+- **L3 eval runner + judge + Eval Card:** TTS cache, paced scenario playback, timing, judge, verdict, cost, card storage. AC-8…AC-19, AC-23, AC-25, AC-27…AC-34, AC-45, AC-47, AC-48, AC-50, AC-51, AC-54, AC-55…AC-61, AC-62…AC-64.
 - **L4 demo page (P2):** AC-36…AC-44, AC-49, AC-52, AC-53.
 - **L5 avatar (P3):** F11; no ACs yet (non-goal of this draft).
 
@@ -485,7 +491,7 @@ Training is the P1 template and carries the AC-5 budget.
 - [NEEDS CLARIFICATION: denominator of "estimated audio cost per minute": session minutes or audio minutes?] — non-blocking, AC-30
 - [NEEDS CLARIFICATION: card texts of the four non-P1 solution templates (boson.ai/solutions)] — non-blocking, AC-3
 - [NEEDS CLARIFICATION: Realtime voice preset list; F7 names presets without listing them, F22 lists TTS presets only] — non-blocking, AC-20
-- [NEEDS CLARIFICATION: whether the assistant transcript (F18) is cut at barge-in and whether its `.done` arrives for a cancelled response (UNVERIFIED)] — non-blocking; settle with the live smoke
+- [NEEDS CLARIFICATION: whether `response.output_audio_transcript.done` arrives for a cancelled response (UNVERIFIED); whether the transcript is cut at barge-in is settled by F27: it is not] — non-blocking; settle with a live run
 - [NEEDS CLARIFICATION: `boson-ai/lina-voice-agent` — is it Boson's reference agent? Ask Boson engineers on site; do not guess its contents] — non-blocking
 - [NEEDS CLARIFICATION: Feynman Flow — what it is and whether a public API is planned; ask on site] — non-blocking
 
@@ -554,6 +560,9 @@ Training is the P1 template and carries the AC-5 budget.
 | AC-59 | red-first unit | two responses at 400 / 1,600 ms → one TTFA of 400 ms | — | — | — |
 | AC-60 | red-first integration | 2 s quiet window → 2 s silence in input audio minutes | — | — | — |
 | AC-61 | red-first unit | split turn + normal turn → response counts 2 and 1 | — | — | — |
+| AC-62 | red-first unit | invalid reply, 412-char transcript → raw text + 412 in run record and stored card | — | — | — |
+| AC-63 | red-first unit | 5,000-char invalid reply → first 2,000 kept, truncated flag | — | — | — |
+| AC-64 | red-first unit | rendered card → cause, length, "kept" note; no reply text or markup | — | — | — |
 
 ## Changelog
 
@@ -564,3 +573,4 @@ Training is the P1 template and carries the AC-5 budget.
 | 2026-10-24 | Status set to approved. | Approved by Glib in chat; written by the main session on his word. |
 | 2026-10-24 | Barge-in aggregate on the Eval Card fixed as p50 and max with N, "not measured" turns excluded; AC-54 added; marker closed. Status left as approved. | Glib's answer: on 3–6 points p95 equals max but reads as statistics that are not there; max with N is more honest. update mode |
 | 2026-10-24 | Added AC-55…AC-61: one Realtime session per scenario with the run budget summed across sessions; a turn's reply ends after a 2 s quiet window, all responses in the window are joined for the judge, TTFA on the first, window silence counts toward budget; responses per turn recorded on the run and the card. Gate diagram, contracts, edge cases, coverage (R-32…R-34) and traceability updated. Status left as approved. | Spec described incomplete behaviour: live gate run `20261024T161045Z-d663176a` (rejected, 4/6) showed a VAD-split turn in st-5 whose real answer leaked into st-6, and shared history across scenarios. Glib's direction to do it properly; quiet window 2 s by Glib's answer. update mode |
+| 2026-10-24 | Added AC-62…AC-64: on an invalid judgment the run record and stored card keep the raw judge reply (first 2,000 characters, truncation flagged) and the transcript length; the shown card has only the length and a "raw reply kept" note. Scenario rubric contract: criteria must not ask the judge to detect a cut-off answer from the transcript (F27). Edge cases, Untrusted inputs, coverage (R-35), traceability updated; transcript open question narrowed. Status left as approved. | F27 (VERIFIED-RUN): transcript holds the full sentence after barge-in, so st-5 went PARTIAL in run `20261024T163013Z-00df50f2` while barge-in stop time was 252 ms. "judge reply invalid" on st-1 in runs `20261024T160618Z-6e8bdda7` and `20261024T162735Z-9c2c615d` could not be diagnosed from the card. Glib's request. update mode |
