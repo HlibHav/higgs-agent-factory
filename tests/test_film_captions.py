@@ -54,8 +54,18 @@ def test_narrator_caption_beat1() -> None:
     assert [(c.start_frame, c.end_frame) for c in beat1] == [
         (_frames(p.start_s), _frames(p.end_s)) for p in placed
     ]
-    assert len(cues) == sum(len(b.narrator) for b in LINES.beats)
+    end_card = next(g for g in LINES.graphics if g.id == "end-card")
+    assert end_card.starts_at_line is not None
+    assert len(cues) == sum(len(b.narrator) for b in LINES.beats) - 1
     assert {"b7-intro", "b7-outro"} <= {c.id for c in cues}
+
+
+def test_no_caption_while_the_end_card_shows() -> None:
+    t = build_timeline(LINES, DURS, TakeWindow(0.0, 10.0))
+    g = graphics_timeline(t, LINES, narrator_captions(t, LINES))
+    slot = next(s for s in g.graphics if s.id == "end-card")
+    card_start = g.total_frames - slot.frames
+    assert all(c.end_frame <= card_start for c in narrator_captions(t, LINES))
 
 
 def test_t1_caption_exact_text_and_span() -> None:

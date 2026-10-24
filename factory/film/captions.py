@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from factory.film.line_data import CaptionCue, LineData
 from factory.film.page_port import CallerPlayed, PageEvent
 from factory.film.takes import TakeVerdict, effective_end, t1_reply_chunks, t2_reply_chunks
-from factory.film.timeline import FPS, FilmTimeline
+from factory.film.timeline import FPS, FilmTimeline, end_card_lines
 
 
 def _frame(seconds: float) -> int:
@@ -26,12 +26,15 @@ def _cue(cue_id: str, kind: str, text: str, start_s: float, end_s: float) -> Cap
 
 def narrator_captions(t: FilmTimeline, lines: LineData) -> list[CaptionCue]:
     """AC-61: each narrator sentence, for the span of its stem. Beat 7's sentences appear only
-    once the take window is known."""
+    once the take window is known. Lines spoken over the end card stay uncaptioned (AC-45), so
+    the caption never covers the card's notes."""
     texts = {n.id: n.text for b in lines.beats for n in b.narrator}
+    on_card = end_card_lines(lines)
     return [
         _cue(p.id, "narrator", texts[p.id], p.start_s, p.end_s)
         for slot in t.beats
         for p in slot.narration
+        if p.id not in on_card
     ]
 
 

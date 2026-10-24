@@ -31,6 +31,15 @@ def test_constants() -> None:
     assert (LEAD_S, TAIL_S, FPS, CAP_S) == (0.4, 0.6, 30, 180.0)
 
 
+def test_end_card_holds_at_least_eight_seconds() -> None:
+    # Glib, after the first cut: 3.8 s was too short to read the card's notes.
+    t = build_timeline(LINES, _durs(1.0), TakeWindow(2.0, 12.0))
+    g = graphics_timeline(t, LINES)
+    slot = next(s for s in g.graphics if s.id == "end-card")
+    assert slot.frames >= 8 * FPS
+    assert g.total_frames == round(t.total_s * FPS)  # the beat grows, the film ends on the card
+
+
 def test_beat_is_line_plus_lead_and_tail() -> None:
     t = build_timeline(LINES, _durs(1.0), TakeWindow(2.0, 12.0))
     by = {b.number: b for b in t.beats}
@@ -88,7 +97,7 @@ def _total_tuned(total_s: float) -> dict[str, float]:
     d = _durs(1.0)
     base = build_timeline(LINES, d, TakeWindow(0.0, 10.0)).total_s
     assert base is not None
-    d["b8-s3"] += total_s - base
+    d["b5-s1"] += total_s - base  # not an end-card line: the card's hold would absorb it
     return d
 
 
@@ -100,7 +109,7 @@ def test_185_refused_180_accepted() -> None:
     with pytest.raises(OverCap) as info:
         check_cap(over, LINES)
     assert any(line.startswith("total: 185.0 s of 180 s (+5.0 s)") for line in info.value.overruns)
-    assert any(line.startswith("beat 8:") for line in info.value.overruns)
+    assert any(line.startswith("beat 5:") for line in info.value.overruns)
 
 
 def test_graphic_slot_frames() -> None:

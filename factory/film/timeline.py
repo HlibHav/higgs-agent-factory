@@ -18,6 +18,8 @@ CAP_FRAMES = int(CAP_S * FPS)
 TAKE_PRE_S = 0.5  # take window opens this long before T1 starts
 TAKE_POST_S = 0.8  # and closes this long after the reply to T2 ends
 TAKE_BEAT = 7
+END_CARD_ID = "end-card"
+END_CARD_MIN_S = 8.0  # AC-45: long enough to read the card's notes
 _EPS = 1e-6
 
 
@@ -69,6 +71,16 @@ def _round_up_to_frame(seconds: float) -> float:
     return math.ceil(seconds * FPS - _EPS) / FPS
 
 
+def end_card_lines(lines: LineData) -> set[str]:
+    """Narrator lines spoken while the end card shows: its first line and every later line of
+    its beat."""
+    card = next((g for g in lines.graphics if g.id == END_CARD_ID), None)
+    if card is None or card.starts_at_line is None:
+        return set()
+    ids = [n.id for b in lines.beats if b.number == card.beat for n in b.narrator]
+    return set(ids[ids.index(card.starts_at_line) :])
+
+
 def build_timeline(
     lines: LineData, durations: Mapping[str, float], take: TakeWindow | None
 ) -> FilmTimeline:
@@ -77,6 +89,7 @@ def build_timeline(
     the placement of every later beat unknown (None)."""
     slots: list[BeatSlot] = []
     cursor: float | None = 0.0
+    on_card = end_card_lines(lines)
     for beat in lines.beats:
         lengths = [durations[n.id] for n in beat.narrator]
         if beat.number == TAKE_BEAT:
@@ -88,6 +101,10 @@ def build_timeline(
             raw = LEAD_S + lengths[0] + TAIL_S + window + LEAD_S + lengths[1] + TAIL_S
         else:
             raw = LEAD_S + sum(lengths) + TAIL_S
+            card_at = [i for i, n in enumerate(beat.narrator) if n.id in on_card]
+            if card_at:
+                # The beat ends on the end card: hold it for at least END_CARD_MIN_S.
+                raw = max(raw, LEAD_S + sum(lengths[: card_at[0]]) + END_CARD_MIN_S)
         duration = _round_up_to_frame(raw)
         narration: list[Placed] = []
         placed_take: Placed | None = None
