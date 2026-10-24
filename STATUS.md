@@ -32,7 +32,7 @@ Last refreshed: 2026-10-24T19:05:00Z by the setup session (Claude Code) on `docs
 
 - Upstream PR opened by Glib, 2026-10-24: https://github.com/boson-ai/ihbench/pull/2 (from `HlibHav:feat/higgs-realtime-client`); converted back to draft by Glib at 2026-10-24 ~19:10Z (`gh pr ready 2 --undo`). Only Boson's maintainers can merge it.
 - Friction findings filed in boson-ai/Boson-Feedback-Collection: issues #40–#45, comments on #18 and #25 (`docs/boson-feedback-filed.md`).
-- Product README: draft PR https://github.com/HlibHav/higgs-agent-factory/pull/1 (`docs/readme-product`).
+- Product README merged: https://github.com/HlibHav/higgs-agent-factory/pull/1; follow-up commits (feedback register, Retry-After correction) merged as `c27730e`.
 - Worktrees `brief-agents-on-page`, `demo-recording-plan-a0eb9d`, `skills-coach-avatar`: branches merged, no uncommitted changes; `worktree_gc.sh` keeps them (live session / recently touched / no merged PR).
 
 ## In progress
