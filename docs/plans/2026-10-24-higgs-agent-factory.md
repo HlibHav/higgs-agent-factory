@@ -465,6 +465,46 @@ DAG levels: 0 → {L1, L2, L3r, L3c} → J → L4. *Cuttable* steps: 6b, 13b, 17
    - verify: `uv run pytest -m "not live" tests/test_gate_wire.py` → all passed
    - checks after 16i (single-agent fix mode): `uv run pytest -m "not live"` · `uv run ruff check` · `uv run ruff format --check`. Then the main session reruns the live gate and checks st-5 turn 2 shows `responses = 1` and no st-5 text appears in st-6.
 
+16j. backend factory: keep the invalid judge reply, capped *(delta 2026-10-24, AC-62…AC-64 and the F27 rubric rule)*
+   - files: `factory/gate/judge.py`, `tests/test_judge.py` (changed)
+   - layer: service
+   - skills: none — project rules only
+   - turns green: AC-63
+   - test first: none beyond the red-first test. Red-first: `tests/test_judge.py`, test_ac63_long_invalid_reply_capped_and_flagged. The judge double returns `"x" * 5000`. Expect `outcome.judgment is None`, `outcome.raw_reply == "x" * 2000` (exactly the first 2,000 characters), `outcome.raw_truncated is True`, and exactly one judge call. Also test_valid_reply_keeps_no_raw: a valid reply gives `raw_reply is None` and `raw_truncated is False`.
+   - interfaces: produces `RAW_REPLY_MAX_CHARS = 2000`, `@dataclass(frozen=True) class JudgeOutcome(judgment: Judgment | None, raw_reply: str | None, raw_truncated: bool)`, and `async judge_scenario_outcome(judge: JudgePort, req: JudgeRequest) -> JudgeOutcome`. It makes exactly one call. On an invalid parse it keeps `raw[:RAW_REPLY_MAX_CHARS]` and sets `raw_truncated = len(raw) > RAW_REPLY_MAX_CHARS`. The kept text is never parsed again and never used as rationale or evidence. `judge_scenario(judge, req) -> Judgment | None` stays as a wrapper that returns `(await judge_scenario_outcome(...)).judgment`, so the existing `tests/test_judge.py` callers stay unchanged.
+   - verify: `uv run pytest -m "not live" tests/test_judge.py -k "ac63 or keeps_no_raw"` → 2 passed, failing run recorded first; then `uv run pytest -m "not live" tests/test_judge.py` → all passed
+
+16k. backend factory: diagnostics in the run record and the stored card
+   - files: `factory/gate/records.py`, `factory/gate/runner.py`, `tests/test_gate_runner.py`, `tests/test_card_store.py` (changed)
+   - layer: domain / service
+   - skills: none — project rules only
+   - turns green: AC-62
+   - test first: none beyond the red-first tests. Red-first:
+     - `tests/test_gate_runner.py`, test_ac62_invalid_reply_and_transcript_length_in_record: the judge double returns `{"label": "MAYBE"}`, and the scenario's session script yields transcript text whose joined transcript is exactly 412 characters. Build the text as `"a" * 412` in one response, with the window shrunk as in the existing fixture. Expect `record.cause == "judge reply invalid"`, `record.scenarios[0].judge_raw_reply == '{"label": "MAYBE"}'`, `judge_raw_truncated is False` and `transcript_chars == 412`.
+     - `tests/test_card_store.py`, test_ac62_diagnostics_survive_store_roundtrip: `build_card(record)`, then `FileCardStore.save`, then `latest()`. The loaded card's `scenarios[0]` has the same three values.
+     - `tests/test_card_store.py`, test_card_without_diagnostics_still_loads: a stored card JSON written without the three keys (copy the shape of a pre-16k card) loads, with `judge_raw_reply is None`, `judge_raw_truncated is False` and `transcript_chars is None`.
+   - interfaces: `ScenarioRecord` gains three last fields, all defaulted: `judge_raw_reply: str | None = None`, `judge_raw_truncated: bool = False`, `transcript_chars: int | None = None`. The runner calls `judge_scenario_outcome` and, only when `outcome.judgment is None`, fills `judge_raw_reply=outcome.raw_reply`, `judge_raw_truncated=outcome.raw_truncated` and `transcript_chars=len(request.transcript)`. The rest of the code path stays the same: one judge call, cause "judge reply invalid", `cause_detail = scenario.id`. `EvalCard` and `build_card` are unchanged, because the fields travel through `EvalCard.scenarios`.
+   - verify: `uv run pytest -m "not live" tests/test_gate_runner.py -k ac62` → 1 passed; `uv run pytest -m "not live" tests/test_card_store.py` → all passed, failing runs recorded first
+
+16l. backend factory: rendered card shows the cause, the length and a "kept" note, never the reply
+   - files: `factory/gate/render.py`, `tests/test_card_store.py` (changed)
+   - layer: domain
+   - skills: none — project rules only
+   - turns green: AC-64
+   - test first: none beyond the red-first test. Red-first: `tests/test_card_store.py`, test_ac64_render_hides_raw_reply. Build a card from a record whose scenario st-1 has `judgment=None`, `judge_raw_reply='<b>PASS</b> {"label":"PASS","rationale":"r-secret","evidence":"e-secret"}'`, `judge_raw_truncated=True`, `transcript_chars=412`, and cause "judge reply invalid". Expect `render_card_text(card)` to contain `st-1`, `judge reply invalid`, `412` and `raw reply kept`, and to contain none of `<b>`, `r-secret`, `e-secret` or the full raw string. Also assert that `card.failing_rubric_lines` holds no entry for st-1, so nothing from the reply appears as rationale or evidence.
+   - interfaces: `render_card_text` adds one line per scenario with `judgment is None and transcript_chars is not None`, of the form `Scenario <id>: judge reply invalid; transcript <n> chars; raw reply kept (not shown)`, with ` (truncated)` appended when `judge_raw_truncated`. The line never reads `judge_raw_reply`.
+   - verify: `uv run pytest -m "not live" tests/test_card_store.py -k ac64` → 1 passed, failing run recorded first
+
+16m. backend factory: st-5 rubric drops the criteria the judge cannot decide (F27)
+   - files: `factory/agent_spec/templates/specialist_training.json`, `tests/test_templates.py` (changed)
+   - layer: domain data
+   - skills: none — project rules only
+   - turns green: none. This is the spec's Scenario-contract rule: a criterion must be decidable from what the judge receives (F27).
+   - test first: `tests/test_templates.py`, test_no_criterion_asks_judge_to_see_a_cut_off. For every Specialist Training scenario, no pass, partial or fail criterion matches `re.compile(r"cut off|mid-sentence|ends early|stops its first answer|continues to its end", re.I)`. This test fails before the edit, on st-5. Update `_ST5_RUBRIC` in `tests/test_templates.py` to the new rubric: remove exactly the pass criterion "The assistant stops its first answer when interrupted, so the first answer in the transcript ends early or mid-sentence." and the partial criterion "The answer to the second question is correct, but the first answer continues to its end as if there was no interruption." Keep every other criterion in its order. Keep the `interrupt_after_assistant_ms == 1500` assertion. This expected-value change follows the spec change (Scenario rubric rule, F27), not the code.
+   - interfaces: st-5 in `specialist_training.json` loses exactly those two strings. Turn texts, voice, `interrupt_after_assistant_ms`, the fail criteria and every other scenario stay unchanged. Interruption handling is shown on the card by barge-in stop time (informational, AC-19).
+   - verify: `uv run pytest -m "not live" tests/test_templates.py` → all passed (the 4 xfailed placeholder templates are unchanged), with the failing run of `-k cut_off` recorded first
+   - checks after 16m: `uv run pytest -m "not live"` · `uv run ruff check` · `uv run ruff format --check`. Then the main session reruns the live gate once.
+
 17b. *cuttable*: expected tool call match
    - files: `factory/gate/runner.py` (changed)
    - layer: service · lane: L3r
