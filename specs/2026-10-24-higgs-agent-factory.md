@@ -499,70 +499,70 @@ Training is the P1 template and carries the AC-5 budget.
 
 | AC | proof | verify | step | test | commit |
 |---|---|---|---|---|---|
-| AC-1 | red-first unit | canned valid / missing-voice generator output → spec / error naming `voice` | — | — | — |
-| AC-2 | red-first unit | 1,001 chars → refusal, 0 model calls | — | — | — |
-| AC-3 | red-first unit | each of 5 templates → valid spec with template id as source | — | — | — |
-| AC-4 | red-first unit | no budget block → gate refused, no session | — | — | — |
-| AC-5 | red-first unit | Specialist Training → exactly 6 / 4 min / 1 / 3 min | — | — | — |
-| AC-6 | red-first unit | `idle_timeout_ms` → error naming it | — | — | — |
-| AC-7 | red-first unit | client tool without mock → error naming tool | — | — | — |
-| AC-8 | red-first integration | two runs → one TTS request per distinct turn | — | — | — |
-| AC-9 | red-first integration | TTS error + recording → "recorded" on card | — | — | — |
-| AC-10 | red-first integration | TTS error, no recording → `incomplete`, turn named | — | — | — |
-| AC-11 | red-first unit | one judge request with 4 inputs, 3 fields stored | — | — | — |
-| AC-12 | red-first unit | PASS, PARTIAL, PASS → `rejected` + failing lines | — | — | — |
-| AC-13 | red-first unit | all PASS → `released` | — | — | — |
-| AC-14 | red-first integration | 4429 mid-scenario → `incomplete`, "quota refused" | — | — | — |
-| AC-15 | red-first integration | `session.idle_timeout` → `incomplete`, "idle timeout" | — | — | — |
-| AC-16 | red-first integration | close 1013 → `incomplete`, "concurrency limit" | — | — | — |
-| AC-17 | red-first integration | low audio limit → stop, `incomplete`, "budget reached" | — | — | — |
-| AC-18 | red-first unit | label "MAYBE" → `incomplete`, one judge call | — | — | — |
-| AC-19 | red-first unit | all PASS, RQ 0%, TTFA p95 30 s → `released` | — | — | — |
-| AC-20 | red-first integration | first session update errors → no scenario, error shown, not `released` | — | — | — |
-| AC-21 | red-first integration | server `web_search` → no client reply, recorded "server" | — | — | — |
-| AC-22 | red-first integration | client tool call → spec mock output, nothing else | — | — | — |
-| AC-23 | red-first unit | expected call observed / missing → "matched" / "not matched" | — | — | — |
-| AC-24 | red-first unit | unknown event mid-scenario → scenario completes | — | — | — |
-| AC-25 | red-first integration | 400 ms server delay after last speech chunk → TTFA 400 ± 50 ms | — | — | — |
-| AC-26 | red-first integration | 3 × (speech_stopped, delta +300 ms) → 3 TTFA ≈ 300 ms | — | — | — |
-| AC-27 | red-first unit | 20 known values → p50, p95, n = 20, label | — | — | — |
-| AC-28 | red-first integration | deltas 250 ms after interruption → ≈ 250 ms | — | — | — |
-| AC-29 | red-first unit | `completed` / no `response.done` / last delta before interruption → "not measured", excluded | — | — | — |
-| AC-30 | red-first unit | 2.0 in + 1.5 out min → 2.0 × F12 in rate + 1.5 × F12 out rate, label | — | — | — |
-| AC-31 | red-first unit | one response with `usage: null` → exact CLAIMS.md token text, no token amount | — | — | — |
-| AC-32 | red-first unit | no dollar amount labelled billed/actual/invoiced | — | — | — |
-| AC-33 | red-first unit | two runs → two cards, distinct run ids, raw records | — | — | — |
-| AC-34 | red-first unit | with / without IHBench output → labelled rate / "not available" | — | — | — |
-| AC-35 | red-first integration | 5 s limit → closed at ≈ 5 s with message | — | — | — |
-| AC-36 | browser (main session) | latest card `rejected` → live session starts with "not released" label throughout | — | — | — |
-| AC-37 | red-first integration | no key string in any page response or message | — | — | — |
-| AC-38 | browser (main session) | open page → five template cards | — | — | — |
-| AC-39 | browser (main session) | gate running → scenario named, labels appear | — | — | — |
-| AC-40 | browser (main session) | run ends → card with verdict word | — | — | — |
-| AC-41 | browser (main session) | 3 turns → 3 TTFA values + start-point label on page | — | — | — |
-| AC-42 | browser (main session) | talk over agent → its audio stops | — | — | — |
-| AC-43 | red-first integration | `session.idle_timeout` → inactivity message + start control | — | — | — |
-| AC-44 | red-first integration | close 4429 → quota message, no reconnect | — | — | — |
-| AC-45 | e2e | live gate on Specialist Training → stored card with measured fields | — | — | — |
-| AC-46 | red-first unit | 7 scenarios, limit 6 → refused, no session | — | — | — |
-| AC-47 | red-first integration | 3 s turn → appends spread over 3 s ± 0.3 s, then silence | — | — | — |
-| AC-48 | red-first unit | 10 scripted + 5 live values → card n = 10 | — | — | — |
-| AC-49 | browser (main session) | click Specialist Training → spec shown | — | — | — |
-| AC-50 | red-first unit | usage on every response, 1,000 in (200 cached) / 300 out → formula, counts, label | — | — | — |
-| AC-51 | red-first unit | usage on every response → token cost headline, audio estimate separate line | — | — | — |
-| AC-52 | browser (main session) | gate step → stored full card with run id and timestamp | — | — | — |
-| AC-53 | red-first integration | stored `rejected` + one live PASS → "single-scenario check", verdict still `rejected` | — | — | — |
-| AC-54 | red-first unit | 200, 300, 900 ms + one "not measured" → p50 300, max 900, N = 3 | — | — | — |
-| AC-55 | red-first integration | 3 scenarios → 3 sessions, each with only its own turns and transcript | — | — | — |
-| AC-56 | red-first integration | limit 10 s, 3 × 4 s scenarios → `incomplete`, "budget reached" in the third | — | — | — |
-| AC-57 | red-first integration | A done, B starts 1.2 s later → next turn ≥ 2 s after B's done | — | — | — |
-| AC-58 | red-first integration | st-5 split replay → both texts in order in st-5's judge request only | — | — | — |
-| AC-59 | red-first unit | two responses at 400 / 1,600 ms → one TTFA of 400 ms | — | — | — |
-| AC-60 | red-first integration | 2 s quiet window → 2 s silence in input audio minutes | — | — | — |
-| AC-61 | red-first unit | split turn + normal turn → response counts 2 and 1 | — | — | — |
-| AC-62 | red-first unit | invalid reply, 412-char transcript → raw text + 412 in run record and stored card | — | — | — |
-| AC-63 | red-first unit | 5,000-char invalid reply → first 2,000 kept, truncated flag | — | — | — |
-| AC-64 | red-first unit | rendered card → cause, length, "kept" note; no reply text or markup | — | — | — |
+| AC-1 | red-first unit | canned valid / missing-voice generator output → spec / error naming `voice` | 6 | `test_generator.py::test_ac1_valid_output_and_missing_voice` | 30a537d; met |
+| AC-2 | red-first unit | 1,001 chars → refusal, 0 model calls | 6 | `test_generator.py::test_ac2_overlong_brief_refused_no_call` | 30a537d; met |
+| AC-3 | red-first unit | each of 5 templates → valid spec with template id as source | 7 | `test_templates.py::test_ac3_each_template_valid_with_source` | 30a537d; partial: Specialist Training passes, 4 templates strict xfail (card text pending) |
+| AC-4 | red-first unit | no budget block → gate refused, no session | 12 | `test_gate_runner.py::test_ac4_missing_budget_refused_no_session` | 4984cc4; met |
+| AC-5 | red-first unit | Specialist Training → exactly 6 / 4 min / 1 / 3 min | 7 | `test_templates.py::test_ac5_specialist_training_budget` | 30a537d; met |
+| AC-6 | red-first unit | `idle_timeout_ms` → error naming it | 2 | `test_agent_spec_schema.py::test_ac6_idle_timeout_ms_rejected` | 7502cd6; met |
+| AC-7 | red-first unit | client tool without mock → error naming tool | 2 | `test_agent_spec_schema.py::test_ac7_client_tool_without_mock` | 7502cd6; met |
+| AC-8 | red-first integration | two runs → one TTS request per distinct turn | 13 | `test_tts_cache.py::test_ac8_one_request_per_distinct_turn` | 4984cc4; met |
+| AC-9 | red-first integration | TTS error + recording → "recorded" on card | 13b | `test_tts_cache.py::test_ac9_recording_fallback_marked_recorded`, `test_gate_runner.py::test_ac9_recorded_fallback_continues_run_and_marks_scenario` | 4984cc4; met |
+| AC-10 | red-first integration | TTS error, no recording → `incomplete`, turn named | 13 | `test_gate_runner.py::test_ac10_no_audio_incomplete_names_turn` | 4984cc4, 1ad12f5; met |
+| AC-11 | red-first unit | one judge request with 4 inputs, 3 fields stored | 15 | `test_judge.py::test_ac11_one_request_four_inputs_three_fields` | 4984cc4; met |
+| AC-12 | red-first unit | PASS, PARTIAL, PASS → `rejected` + failing lines | 18 | `test_verdict.py::test_ac12_partial_rejects_with_failing_lines` | b9a6904; met |
+| AC-13 | red-first unit | all PASS → `released` | 18 | `test_verdict.py::test_ac13_all_pass_releases` | b9a6904; met |
+| AC-14 | red-first integration | 4429 mid-scenario → `incomplete`, "quota refused" | 9, 16 | `test_runtime_session.py::test_ac14_4429_maps_quota_refused`, `test_gate_runner.py::test_ac14_quota_refused_incomplete` | 4bdf47a, 4984cc4; met |
+| AC-15 | red-first integration | `session.idle_timeout` → `incomplete`, "idle timeout" | 9, 16 | `test_runtime_session.py::test_ac15_idle_timeout_cause`, `test_gate_runner.py::test_ac15_idle_timeout_incomplete` | 4bdf47a, 4984cc4; met |
+| AC-16 | red-first integration | close 1013 → `incomplete`, "concurrency limit" | 9, 16 | `test_runtime_session.py::test_ac16_1013_concurrency_limit`, `test_gate_runner.py::test_ac16_concurrency_limit_incomplete` | 4bdf47a, 4984cc4; met |
+| AC-17 | red-first integration | low audio limit → stop, `incomplete`, "budget reached" | 16 | `test_gate_runner.py::test_ac17_audio_budget_reached` | 4984cc4; met (OPEN security S1: NaN/Infinity budget on a brief spec bypasses the cap) |
+| AC-18 | red-first unit | label "MAYBE" → `incomplete`, one judge call | 15, 18 | `test_judge.py::test_ac18_invalid_label_one_call`, `test_verdict.py::test_ac18_cause_makes_incomplete_even_if_labels_pass` | 4984cc4, b9a6904; met |
+| AC-19 | red-first unit | all PASS, RQ 0%, TTFA p95 30 s → `released` | 18 | `test_verdict.py::test_ac19_slow_ttfa_does_not_change_verdict` | b9a6904; met |
+| AC-20 | red-first integration | first session update errors → no scenario, error shown, not `released` | 9, 16 | `test_runtime_session.py::test_ac20_refused_voice_raises_with_text`, `test_gate_runner.py::test_ac20_refused_voice_no_scenario_not_released` | 4bdf47a, 4984cc4; met |
+| AC-21 | red-first integration | server `web_search` → no client reply, recorded "server" | 10 | `test_runtime_session.py::test_ac21_server_web_search_no_reply` | 4bdf47a; met |
+| AC-22 | red-first integration | client tool call → spec mock output, nothing else | 10, 16 | `test_runtime_session.py::test_ac22_tool_output_sent`, `test_gate_runner.py::test_ac22_client_tool_gets_mock` | 4bdf47a, 4984cc4; met |
+| AC-23 | red-first unit | expected call observed / missing → "matched" / "not matched" | 17b | `test_gate_runner.py::test_ac23_expected_call_matched_and_not` | 4984cc4; met |
+| AC-24 | red-first unit | unknown event mid-scenario → scenario completes | 16 | `test_gate_runner.py::test_ac24_unknown_event_ignored` | 4984cc4; met |
+| AC-25 | red-first integration | 400 ms server delay after last speech chunk → TTFA 400 ± 50 ms | 14 | `test_playback.py::test_ac25_ttfa_from_last_speech_chunk` | 4984cc4; met |
+| AC-26 | red-first integration | 3 × (speech_stopped, delta +300 ms) → 3 TTFA ≈ 300 ms | 26 (P2) | — (not built) | —; not met (step 26 not started, pending Glib's decision) |
+| AC-27 | red-first unit | 20 known values → p50, p95, n = 20, label | 19 | `test_metrics.py::test_ac27_p50_p95_n_and_label` | b9a6904; met |
+| AC-28 | red-first integration | deltas 250 ms after interruption → ≈ 250 ms | 17c | `test_playback.py::test_ac28_bargein_stop_time` | 4984cc4; met |
+| AC-29 | red-first unit | `completed` / no `response.done` / last delta before interruption → "not measured", excluded | 17c, 20b | `test_metrics.py::test_ac29_ac54_not_measured_excluded`, `test_gate_runner.py::test_ac29_completed_interruption_is_not_measured`, `test_gate_runner.py::test_ac29_cancelled_interruption_is_measured` | b9a6904 + runner fix uncommitted; partial: `completed` case fixed red-first, no-`response.done` case untested (NEEDS-GLIB) |
+| AC-30 | red-first unit | 2.0 in + 1.5 out min → 2.0 × F12 in rate + 1.5 × F12 out rate, label | 21 | `test_cost.py::test_ac30_audio_cost_formula_and_label` | b9a6904; met |
+| AC-31 | red-first unit | one response with `usage: null` → exact CLAIMS.md token text, no token amount | 21 | `test_cost.py::test_ac31_missing_usage_gives_exact_text_and_no_token_amount` | b9a6904; met |
+| AC-32 | red-first unit | no dollar amount labelled billed/actual/invoiced | 21, 27 | `test_cost.py::test_ac32_no_amount_labelled_billed_actual_or_invoiced` | b9a6904; partial: card half met, page half not built (step 27) |
+| AC-33 | red-first unit | two runs → two cards, distinct run ids, raw records | 22 | `test_card_store.py::test_ac33_two_runs_two_cards`, `test_card_store.py::test_ac33_never_overwrites` | b9a6904; met |
+| AC-34 | red-first unit | with / without IHBench output → labelled rate / "not available" | 22b | — (not built) | —; not met (step 22b not started, pending Glib's decision) |
+| AC-35 | red-first integration | 5 s limit → closed at ≈ 5 s with message | 26 (P2) | — (not built) | —; not met (step 26 not started) |
+| AC-36 | browser (main session) | latest card `rejected` → live session starts with "not released" label throughout | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-37 | red-first integration | no key string in any page response or message | 27 (P2) | — (not built) | —; not met (step 27 not started) |
+| AC-38 | browser (main session) | open page → five template cards | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-39 | browser (main session) | gate running → scenario named, labels appear | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-40 | browser (main session) | run ends → card with verdict word | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-41 | browser (main session) | 3 turns → 3 TTFA values + start-point label on page | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-42 | browser (main session) | talk over agent → its audio stops | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-43 | red-first integration | `session.idle_timeout` → inactivity message + start control | 27 (P2) | — (not built) | —; not met (step 27 not started) |
+| AC-44 | red-first integration | close 4429 → quota message, no reconnect | 27 (P2) | — (not built) | —; not met (step 27 not started) |
+| AC-45 | e2e | live gate on Specialist Training → stored card with measured fields | 24 | `test_e2e_gate.py::test_ac45_specialist_training_live`; docs/evidence/eval-card-20261024T164057Z-9e2ee667.txt | b29bde5; met (stored card: rejected, n = 7, $0.0116 est. audio; not re-run in this loop) |
+| AC-46 | red-first unit | 7 scenarios, limit 6 → refused, no session | 12 | `test_gate_runner.py::test_ac46_too_many_scenarios` | 4984cc4; met |
+| AC-47 | red-first integration | 3 s turn → appends spread over 3 s ± 0.3 s, then silence | 14 | `test_playback.py::test_ac47_realtime_pace_then_silence` | 4984cc4; met |
+| AC-48 | red-first unit | 10 scripted + 5 live values → card n = 10 | 19b | `test_metrics.py::test_ac48_scripted_only` | b9a6904; met |
+| AC-49 | browser (main session) | click Specialist Training → spec shown | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-50 | red-first unit | usage on every response, 1,000 in (200 cached) / 300 out → formula, counts, label | 21b | — (not built) | —; not met (step 21b not started, pending Glib's decision) |
+| AC-51 | red-first unit | usage on every response → token cost headline, audio estimate separate line | 21c | — (not built) | —; not met (step 21c not started, pending Glib's decision) |
+| AC-52 | browser (main session) | gate step → stored full card with run id and timestamp | 28 (P2) | browser (main session), page not built | —; not verifiable (step 28 not started) |
+| AC-53 | red-first integration | stored `rejected` + one live PASS → "single-scenario check", verdict still `rejected` | 27 (P2) | — (not built) | —; not met (step 27 not started) |
+| AC-54 | red-first unit | 200, 300, 900 ms + one "not measured" → p50 300, max 900, N = 3 | 20b | `test_metrics.py::test_ac29_ac54_not_measured_excluded` | b9a6904; met |
+| AC-55 | red-first integration | 3 scenarios → 3 sessions, each with only its own turns and transcript | 16d | `test_gate_runner.py::test_ac55_one_session_per_scenario` | 2460473; met |
+| AC-56 | red-first integration | limit 10 s, 3 × 4 s scenarios → `incomplete`, "budget reached" in the third | 16d | `test_gate_runner.py::test_ac56_budget_sums_across_sessions` | 2460473; met |
+| AC-57 | red-first integration | A done, B starts 1.2 s later → next turn ≥ 2 s after B's done | 16e | `test_gate_runner.py::test_ac57_turn_ends_two_seconds_after_last_response` | 2460473; met |
+| AC-58 | red-first integration | st-5 split replay → both texts in order in st-5's judge request only | 16e, 16h | `test_gate_runner.py::test_ac58_split_reply_joined_for_its_own_scenario_only` | 2460473; met |
+| AC-59 | red-first unit | two responses at 400 / 1,600 ms → one TTFA of 400 ms | 16f | `test_gate_runner.py::test_ac59_ttfa_on_first_response_only` | 2460473; met |
+| AC-60 | red-first integration | 2 s quiet window → 2 s silence in input audio minutes | 16e | `test_gate_runner.py::test_ac60_window_silence_counts_toward_budget` | 2460473; met |
+| AC-61 | red-first unit | split turn + normal turn → response counts 2 and 1 | 16g | `test_gate_runner.py::test_ac61_responses_per_turn_recorded_and_shown` | 2460473; met |
+| AC-62 | red-first unit | invalid reply, 412-char transcript → raw text + 412 in run record and stored card | 16j, 16k | `test_gate_runner.py::test_ac62_invalid_reply_and_transcript_length_in_record`, `test_card_store.py::test_ac62_diagnostics_survive_store_roundtrip` | ab2eae2; met |
+| AC-63 | red-first unit | 5,000-char invalid reply → first 2,000 kept, truncated flag | 16j | `test_judge.py::test_ac63_long_invalid_reply_capped_and_flagged` | ab2eae2; met |
+| AC-64 | red-first unit | rendered card → cause, length, "kept" note; no reply text or markup | 16l | `test_card_store.py::test_ac64_render_hides_raw_reply` | ab2eae2; met |
 
 ## Changelog
 
@@ -574,3 +574,4 @@ Training is the P1 template and carries the AC-5 budget.
 | 2026-10-24 | Barge-in aggregate on the Eval Card fixed as p50 and max with N, "not measured" turns excluded; AC-54 added; marker closed. Status left as approved. | Glib's answer: on 3–6 points p95 equals max but reads as statistics that are not there; max with N is more honest. update mode |
 | 2026-10-24 | Added AC-55…AC-61: one Realtime session per scenario with the run budget summed across sessions; a turn's reply ends after a 2 s quiet window, all responses in the window are joined for the judge, TTFA on the first, window silence counts toward budget; responses per turn recorded on the run and the card. Gate diagram, contracts, edge cases, coverage (R-32…R-34) and traceability updated. Status left as approved. | Spec described incomplete behaviour: live gate run `20261024T161045Z-d663176a` (rejected, 4/6) showed a VAD-split turn in st-5 whose real answer leaked into st-6, and shared history across scenarios. Glib's direction to do it properly; quiet window 2 s by Glib's answer. update mode |
 | 2026-10-24 | Added AC-62…AC-64: on an invalid judgment the run record and stored card keep the raw judge reply (first 2,000 characters, truncation flagged) and the transcript length; the shown card has only the length and a "raw reply kept" note. Scenario rubric contract: criteria must not ask the judge to detect a cut-off answer from the transcript (F27). Edge cases, Untrusted inputs, coverage (R-35), traceability updated; transcript open question narrowed. Status left as approved. | F27 (VERIFIED-RUN): transcript holds the full sentence after barge-in, so st-5 went PARTIAL in run `20261024T163013Z-00df50f2` while barge-in stop time was 252 ms. "judge reply invalid" on st-1 in runs `20261024T160618Z-6e8bdda7` and `20261024T162735Z-9c2c615d` could not be diagnosed from the card. Glib's request. update mode |
+| 2026-10-24 | traceability filled after review loop | Claude |
