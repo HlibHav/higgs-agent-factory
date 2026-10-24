@@ -1,0 +1,15 @@
+# Friction log (for Boson)
+
+What we hit while building on Boson's public APIs, dated, so it can be handed to the team as is.
+Protocol facts are cited by id from [boson-protocol.md](boson-protocol.md).
+
+Severity: `high` blocks a use case Boson advertises · `medium` costs hours or forces a
+workaround · `low` is a papercut.
+
+| date | area | what happened | expected | doc link | severity |
+|---|---|---|---|---|---|
+| 2026-10-24 | Realtime billing | `response.done` has `usage: null` on every response (F2), while Realtime is billed by tokens (F12). A client cannot compute or cap its own spend per turn. | Per-response token usage, as the OpenAI-compatible schema defines. | https://docs.boson.ai/models/higgs-realtime/migrate-an-existing-integration | medium |
+| 2026-10-24 | Avatar / LiveKit | The LiveKit Agents avatar plugin is not installable from PyPI: the 1.8.8 release does not work with the API, and the docs pin a commit on a personal fork, `warlockee/agents@808a424…` (F11). | `pip install livekit-plugins-boson-avatar` from a Boson-owned release. | https://docs.boson.ai/models/higgs-avatar/realtime-sessions | medium |
+| 2026-10-24 | Transport | Realtime is WebSocket only, with no SIP and no WebRTC (F9). The solutions page advertises "Automate outbound prospecting" (Health Insurance) and "Classify incoming calls" (AI Receptionist). | A documented path from a phone call to a Realtime session, or a note that telephony needs a third-party bridge. | https://www.boson.ai/solutions | high |
+| 2026-10-24 | IHBench | IHBench's `openai_realtime_client.py` cannot run against Higgs Realtime: it waits for `session.created` before `session.update` (F1), sends user audio as `input_audio` items and history as `output_text` (F3), and counts `conversation.item.done` events (F5). | Boson's own benchmark runs against Boson's own API out of the box. | https://github.com/boson-ai/ihbench | medium |
+| 2026-10-24 | IHBench | The README's "two files, zero runner edits" pattern covers local HF models only; an API backend needs a `make_client` branch in `scripts/run_inference_api.py`. | The documented extension point covers API clients too. | https://github.com/boson-ai/ihbench | low |

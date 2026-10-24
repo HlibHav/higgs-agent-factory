@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "dev-digest-ai-marketplace": {
+      "source": { "source": "github", "repo": "HlibHav/dev-digest-ai-marketplace" }
+    }
+  },
+  "enabledPlugins": {
+    "sdd-engineering@dev-digest-ai-marketplace": true,
+    "engineering-paved-path@dev-digest-ai-marketplace": true,
+    "research-tools@dev-digest-ai-marketplace": true,
+    "architecture-review@dev-digest-ai-marketplace": true
+  }
+}

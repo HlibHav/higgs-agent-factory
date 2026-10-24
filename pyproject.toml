@@ -1,0 +1,33 @@
+[project]
+name = "higgs-agent-factory"
+version = "0.0.0"
+description = "One-line brief -> Agent Spec -> eval gate -> Eval Card, on Boson's Higgs Realtime API."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+    # scripts/smoke.py only; runtime dependencies are chosen by the plan, not here.
+    "websockets>=13.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "live: talks to the real Boson API and spends credits; never run by read-only agents",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["vendor-ref"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
