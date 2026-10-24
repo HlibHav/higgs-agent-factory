@@ -30,7 +30,7 @@ Last refreshed: 2026-10-24T19:05:00Z by the setup session (Claude Code) on `docs
 - Glib's decisions 2026-10-24: composition root on the SDK allow-list (A1 closed); the websockets 12–13 redirect caveat is documented in the PR body; IHBench spec `Status: implemented`; branch merged into `main`.
 - Hand-off for Boson: `docs/BOSON-HANDOFF.md`. Demo runbook: `docs/DEMO-RUNBOOK.md`. Upstream PR body and command: `docs/ihbench-pr/` (not run).
 
-- Upstream PR opened by Glib, 2026-10-24: https://github.com/boson-ai/ihbench/pull/2 (from `HlibHav:feat/higgs-realtime-client`); converted back to draft by Glib at 2026-10-24 ~19:10Z (`gh pr ready 2 --undo`). Only Boson's maintainers can merge it.
+- Upstream PR opened by Glib, 2026-10-24: https://github.com/boson-ai/ihbench/pull/2 (from `HlibHav:feat/higgs-realtime-client`); marked ready for review on Glib's word after the demo was recorded (2026-10-24; head `abd6bd9`, 54 tests green on websockets 17.3 and 12.0, footprint 3 files). Only Boson's maintainers can merge it.
 - Friction findings filed in boson-ai/Boson-Feedback-Collection: issues #40–#45, comments on #18 and #25 (`docs/boson-feedback-filed.md`).
 - Product README merged: https://github.com/HlibHav/higgs-agent-factory/pull/1; follow-up commits (feedback register, Retry-After correction) merged as `c27730e`.
 - Worktrees `brief-agents-on-page`, `demo-recording-plan-a0eb9d`, `skills-coach-avatar`: branches merged, no uncommitted changes; `worktree_gc.sh` keeps them (live session / recently touched / no merged PR).
