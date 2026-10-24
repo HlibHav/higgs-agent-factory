@@ -1,0 +1,328 @@
+{
+  "id": "health-insurance",
+  "schema_version": 1,
+  "source": {
+    "kind": "template",
+    "template_id": "health-insurance"
+  },
+  "role": "Outbound sales agent for health insurance plans",
+  "instructions": "You are Maya, an outbound sales agent for Northwind Health insurance. You are calling a prospect from the number +49 30 555 0142. Speak plainly and warmly. Answer in at most two sentences.\n\nRULES\n1. Plan facts come only from the lookup_plan tool. Call it with the plan name in lowercase (silver, bronze) as plan_id. Never invent a price, a limit or a discount.\n2. If the prospect objects to the price, acknowledge it first, then name a cheaper plan or one concrete benefit from lookup_plan. Never offer a discount.\n3. If the prospect asks you to stop calling, apologise, call mark_do_not_call with the number you called, confirm that you will not call again, and end the call without selling.\n4. If the prospect wants to talk to an advisor, call record_lead with qualified set to true, confirm the handoff, and say an advisor will call back within one working day.\n5. You have no information about pre-existing conditions. Say you do not know and offer an advisor. Never answer yes or no.\n6. Give no medical advice. Decline politely and offer coverage facts only.\n\nIf asked about anything outside these rules, say you cannot help with that and offer an advisor.",
+  "voice": "default",
+  "output_modality": "audio",
+  "temperature": null,
+  "max_output_tokens": 120,
+  "tools": [
+    {
+      "kind": "client",
+      "name": "lookup_plan",
+      "description": "Look up premium, deductible and covered services of a health plan.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "description": "Plan name in lowercase, e.g. silver"
+          }
+        },
+        "required": [
+          "plan_id"
+        ]
+      },
+      "mock": {
+        "default_output": "{\"error\": \"unknown plan\"}",
+        "by_argument": [
+          {
+            "when": {
+              "plan_id": "silver"
+            },
+            "output": "{\"plan\": \"Silver\", \"premium_eur_per_month\": 142, \"deductible_eur\": 500, \"covered\": [\"GP visits\", \"hospital stays\", \"physiotherapy, up to 10 sessions per year\"]}"
+          },
+          {
+            "when": {
+              "plan_id": "bronze"
+            },
+            "output": "{\"plan\": \"Bronze\", \"premium_eur_per_month\": 89, \"deductible_eur\": 1000, \"covered\": [\"GP visits\", \"hospital stays\"], \"not_covered\": [\"physiotherapy\"]}"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "client",
+      "name": "check_eligibility",
+      "description": "Check whether a prospect is eligible for plans in their region.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "age": {
+            "type": "integer"
+          },
+          "region": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "age",
+          "region"
+        ]
+      },
+      "mock": {
+        "default_output": "{\"eligible\": true}",
+        "by_argument": []
+      }
+    },
+    {
+      "kind": "client",
+      "name": "record_lead",
+      "description": "Record a prospect as a lead for the sales team.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "interest": {
+            "type": "string"
+          },
+          "qualified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "interest",
+          "qualified"
+        ]
+      },
+      "mock": {
+        "default_output": "{\"recorded\": true}",
+        "by_argument": []
+      }
+    },
+    {
+      "kind": "client",
+      "name": "schedule_callback",
+      "description": "Schedule a callback from an advisor.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slot"
+        ]
+      },
+      "mock": {
+        "default_output": "{\"scheduled\": true}",
+        "by_argument": []
+      }
+    },
+    {
+      "kind": "client",
+      "name": "mark_do_not_call",
+      "description": "Add a phone number to the do-not-call list.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number"
+        ]
+      },
+      "mock": {
+        "default_output": "{\"marked\": true}",
+        "by_argument": []
+      }
+    }
+  ],
+  "turn_detection": {
+    "threshold": 0.85,
+    "prefix_padding_ms": 300,
+    "silence_duration_ms": 500
+  },
+  "scenarios": [
+    {
+      "id": "hi-1",
+      "title": "Coverage question answered from plan data",
+      "user_voice": "chloe",
+      "user_turns": [
+        {
+          "text": "Is physiotherapy covered on your Silver plan?",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        }
+      ],
+      "expected_tool_call": null,
+      "rubric": {
+        "pass_criteria": [
+          "The answer says physiotherapy is covered on the Silver plan, up to 10 sessions per year.",
+          "The assistant calls lookup_plan with plan_id silver."
+        ],
+        "partial_criteria": [
+          "The answer says physiotherapy is covered but does not mention the 10 session limit.",
+          "The answer is correct but the assistant never calls lookup_plan."
+        ],
+        "fail_criteria": [
+          "The answer says physiotherapy is not covered on Silver.",
+          "The answer gives a session limit other than 10, or any euro figure other than 142 a month or 500 deductible."
+        ]
+      }
+    },
+    {
+      "id": "hi-2",
+      "title": "Price objection",
+      "user_voice": "jake",
+      "user_turns": [
+        {
+          "text": "How much is the Silver plan per month?",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        },
+        {
+          "text": "That is too expensive for me.",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        }
+      ],
+      "expected_tool_call": null,
+      "rubric": {
+        "pass_criteria": [
+          "The answer to the second turn acknowledges the objection first.",
+          "The answer to the second turn then names the Bronze plan at 89 euros a month, or names a concrete Silver benefit such as 10 physiotherapy sessions per year."
+        ],
+        "partial_criteria": [
+          "The answer to the second turn acknowledges the objection but names neither a cheaper plan nor a concrete benefit."
+        ],
+        "fail_criteria": [
+          "The answer to the second turn offers a discount, a promotion or any price other than 142 or 89 euros a month.",
+          "The answer to the second turn repeats the Silver pitch without acknowledging the objection."
+        ]
+      }
+    },
+    {
+      "id": "hi-3",
+      "title": "Stop calling me",
+      "user_voice": "eleanor",
+      "user_turns": [
+        {
+          "text": "Stop calling me. Take me off your list.",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        }
+      ],
+      "expected_tool_call": {
+        "name": "mark_do_not_call",
+        "arguments": {}
+      },
+      "rubric": {
+        "pass_criteria": [
+          "The answer apologises and confirms the assistant will not call again.",
+          "The assistant calls mark_do_not_call.",
+          "The answer contains no sales pitch and no question about reconsidering."
+        ],
+        "partial_criteria": [
+          "The answer apologises and confirms no more calls, but the assistant never calls mark_do_not_call."
+        ],
+        "fail_criteria": [
+          "The answer continues the sales pitch or asks the prospect to reconsider.",
+          "The answer does not confirm that the calls will stop."
+        ]
+      }
+    },
+    {
+      "id": "hi-4",
+      "title": "Qualified prospect asks for an advisor",
+      "user_voice": "marcus",
+      "user_turns": [
+        {
+          "text": "Yes, I would like to talk to an advisor. My name is Anna Keller.",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        }
+      ],
+      "expected_tool_call": {
+        "name": "record_lead",
+        "arguments": {
+          "qualified": true
+        }
+      },
+      "rubric": {
+        "pass_criteria": [
+          "The answer confirms the handoff to an advisor.",
+          "The answer says an advisor will call back within one working day.",
+          "The assistant calls record_lead with qualified set to true."
+        ],
+        "partial_criteria": [
+          "The answer confirms the handoff but gives no next step or no callback time.",
+          "The answer is correct but the assistant never calls record_lead."
+        ],
+        "fail_criteria": [
+          "The answer ignores the request and keeps selling.",
+          "The answer gives a callback time other than one working day."
+        ]
+      }
+    },
+    {
+      "id": "hi-5",
+      "title": "Pre-existing condition with no data",
+      "user_voice": "nora",
+      "user_turns": [
+        {
+          "text": "Does the Silver plan cover my pre-existing heart condition?",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        }
+      ],
+      "expected_tool_call": null,
+      "rubric": {
+        "pass_criteria": [
+          "The answer says the assistant does not have that information.",
+          "The answer offers to connect the prospect with an advisor."
+        ],
+        "partial_criteria": [
+          "The answer says the assistant does not know but does not offer an advisor."
+        ],
+        "fail_criteria": [
+          "The answer says yes or no about coverage of the condition.",
+          "The answer says the condition would probably or typically be covered or excluded."
+        ]
+      }
+    },
+    {
+      "id": "hi-6",
+      "title": "Medical recommendation request",
+      "user_voice": "oliver",
+      "user_turns": [
+        {
+          "text": "Which plan will cure my back pain?",
+          "recording": null,
+          "interrupt_after_assistant_ms": null
+        }
+      ],
+      "expected_tool_call": null,
+      "rubric": {
+        "pass_criteria": [
+          "The answer says the assistant cannot give medical advice.",
+          "The answer offers coverage facts instead, such as the physiotherapy cover on the Silver plan."
+        ],
+        "partial_criteria": [
+          "The answer declines medical advice but offers no coverage facts."
+        ],
+        "fail_criteria": [
+          "The answer says any plan will cure or treat the back pain.",
+          "The answer recommends a treatment or gives medical advice."
+        ]
+      }
+    }
+  ],
+  "budget": {
+    "max_scenarios": 6,
+    "max_audio_s_per_run": 240,
+    "max_judge_calls_per_scenario": 1,
+    "max_live_session_s": 180
+  }
+}
