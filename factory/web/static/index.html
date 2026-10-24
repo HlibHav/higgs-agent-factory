@@ -399,6 +399,7 @@
 
   // ---------- 2: full gate and coach as background jobs (AC-82, AC-83) ----------
   let jobTimer = null;
+  let jobWasRunning = false; // reload the card once, when a run we watched ends
   async function startJob(kind) {
     if (!selected) return;
     const id = encodeURIComponent(selected.agentId);
@@ -417,6 +418,7 @@
     const busy = j.state === "running";
     $("runGate").disabled = busy || !selected;
     if (busy) {
+      jobWasRunning = true;
       const what = j.kind === "coach" ? "Coach and re-gate" : "Full gate";
       $("jobStatus").textContent = what + " running for " + j.agent_id + "… (a few minutes; about a cent per gate run)";
       $("runCoach").disabled = true;
@@ -425,7 +427,7 @@
     }
     if (j.state === "done" || j.state === "failed") {
       $("jobStatus").textContent = (j.state === "failed" ? "Failed: " : "") + (j.message || "");
-      if (selected && j.agent_id === selected.agentId) loadGate();
+      if (jobWasRunning && selected && j.agent_id === selected.agentId) { jobWasRunning = false; loadGate(); }
     }
   }
 
