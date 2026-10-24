@@ -41,6 +41,7 @@ Doc URLs below drop the common prefix `https://docs.boson.ai/`.
 | F24 | Turn detection is set at `session.audio.input.turn_detection`: `{"type": "server_vad"}`, `{"type": "semantic_vad"}`, or `null` for manual commit (F16). With `null`, appended audio does not start a response on its own. | https://docs.boson.ai/models/higgs-realtime/guides/connections-and-sessions · https://docs.boson.ai/models/higgs-realtime/guides/turn-detection-and-interruptions | VERIFIED-RUN (2026-10-24) | IHBench AC-14 live replay (`ihbench-higgs/results/ac14-20261024T153754Z.jsonl`, 3 audio commits): no `response.*` event before the client's `response.create`. |
 | F25 | Replay acks and ordering: a text item sent with `conversation.item.create` is acked by `conversation.item.added`. An audio commit is acked first by `input_audio_buffer.committed` (`item_id`, `previous_item_id`) and later by `conversation.item.added` for the same id (role `user`, content `input_audio`). Items interleaved as text, commit, text, commit keep that order: each `previous_item_id` is the item sent just before. | https://docs.boson.ai/api-reference/realtime/server-events | VERIFIED-RUN (2026-10-24) | Same AC-14 log: chain `d941cc6a` (assistant text) → `15a8c726` (user audio, prev `d941cc6a`) → `71ca752a` → `1154e236` (prev `71ca752a`) → `599ce5b8` → `216d22ef` (prev `599ce5b8`). |
 | F26 | **TTS docs and wire disagree on `model`.** Docs: `model` is optional, default `higgs-tts-3` (F22). Observed: `POST /v1/audio/speech` without `model` returns `400 invalid_request_error` (pydantic `missing`, loc `model`); with `"model": "higgs-tts-3"`, `voice: "chloe"`, `response_format: "pcm"`, `stream: true` it returns `200`, `content-type: audio/pcm`. The endpoint also returned `429` `rate_limit_error` / `rate_limit_exceeded` with no `Retry-After` header; the limit's value and window are undocumented. | https://docs.boson.ai/api-reference/audio/create-a-speech | VERIFIED-RUN (2026-10-24) | Probes from the main session, 12:04 Toronto: 400 body names `loc ('model',)`; 200 run returned 36,480 bytes for "Hi."; the live gate run `20261024T160329Z-aafb9522` hit the 429 on its first TTS call. |
+| F27 | The assistant transcript is not a record of what was heard. In audio mode the whole response text can arrive in the first `response.output_audio_transcript.delta`, well before the audio finishes; after a barge-in stops the audio, the transcript already holds the full sentence. A judge reading the transcript cannot tell whether an answer was cut off. | https://docs.boson.ai/api-reference/realtime/server-events | VERIFIED-RUN (2026-10-24) | Probe 12:15 Toronto: full sentence in the first delta at 0.279 s, audio done at 0.631 s. Gate run `20261024T163013Z-00df50f2`: barge-in stop time 252 ms on st-5 turn 1, yet the judge's transcript holds that answer complete. |
 
 ## F12 — price table
 
@@ -67,8 +68,8 @@ they go in code.
 - Whether the model emits parallel tool calls in one response, and how `response.done` lists
   them.
 - How long `session.max_duration_reached` allows (the docs give no number).
-- Whether the assistant transcript (F18) is cut at a barge-in, and whether
-  `response.output_audio_transcript.done` is sent for a cancelled response.
+- Whether `response.output_audio_transcript.done` is sent for a cancelled response (F27 settles
+  that the transcript is not cut).
 - The clock origin of `audio_start_ms` / `audio_end_ms` (F15).
 - The value of the Realtime concurrency limit (F21).
 - TTS 3 sample rates for non-streaming formats, and whether `voice: "default"` is accepted on
