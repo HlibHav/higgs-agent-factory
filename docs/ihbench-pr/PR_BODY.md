@@ -1,5 +1,3 @@
-<!-- PR title: Add Higgs Realtime client (higgs-realtime backend) -->
-
 Adds the public client for running IHBench against Boson's Higgs Realtime API, the benchmark Boson already reports on.
 
 ## What it adds
@@ -8,7 +6,7 @@ Three files, no new dependencies, existing clients untouched:
 
 - `ihbench/clients/higgs_realtime_client.py` (new): `HiggsRealtimeClient`, text output over the Higgs Realtime WebSocket (`wss://api.boson.ai/v1/realtime`).
 - `configs/higgs-realtime.yaml` (new): `backend: higgs-realtime`, `model: higgs-realtime`, key from `${BOSON_API_KEY}`.
-- `scripts/run_inference_api.py`: about six lines. `higgs-realtime` joins the `--backend` choices, and `make_client` gets one `elif` branch that builds the new client.
+- `scripts/run_inference_api.py`: one changed line and four added (`+5 −1`). `higgs-realtime` joins the `--backend` choices, and `make_client` gets one `elif` branch that builds the new client.
 
 ## Why the OpenAI realtime client can't be reused
 
@@ -36,20 +34,24 @@ python scripts/run_inference_api.py \
 
 ## Results measured
 
-- Smoke run, the command above: `Done. 10 responses saved to responses/higgs-realtime.jsonl, 0 failures.`
+- Smoke run, the command above, on this PR's head `abd6bd9`: `Done. 10 responses saved to responses/higgs-realtime.jsonl, 0 failures.` The 10 rows cover four interruption types (`filler`, `impatient`, `normal`, `pushback`) from two conversations, and no attempt failed or was retried.
 - Replay order, checked live: each `input_audio_buffer.committed.previous_item_id` points at the item sent just before it, and no response starts before `response.create`.
-- Offline tests with a fake WebSocket: 50 passed on websockets 17.3 and 50 passed on websockets 12.0 (the `realtime` extra's floor).
+- Offline tests with a fake WebSocket: 54 passed on websockets 17.3 and 54 passed on websockets 12.0 (the `realtime` extra's floor).
 - Footprint: `git diff --name-only upstream/main...` lists exactly the three files above.
 
 ## What is not included
 
-- **The tests.** The 50 offline tests live on [`chore/higgs-realtime-client-tests`](https://github.com/HlibHav/ihbench/tree/chore/higgs-realtime-client-tests) to keep this PR small, since the repo has no `tests/` folder yet. Happy to add them here if you want one.
+- **The tests.** The 54 offline tests live on [`chore/higgs-realtime-client-tests`](https://github.com/HlibHav/ihbench/tree/chore/higgs-realtime-client-tests) to keep this PR small, since the repo has no `tests/` folder yet. Happy to add them here if you want one.
 - **Judge numbers.** This PR claims no IHBench TF or RQ score for Higgs Realtime. Only inference was run, on 10 samples; `run_evaluate.py` was not run on the output.
 - **Audio output.** The client asks for text output only, which is what the judges read.
 
 ## Known limitations
 
 - On `websockets` 12.x–13.x (legacy client, `extra_headers`), a cross-host HTTP redirect during the handshake would resend the `Authorization` header to the new host; 14+ strips it. `api.boson.ai` does not redirect today. Prefer `websockets>=14` when you can.
+
+## Context
+
+I wrote this client while building [Higgs Agent Factory](https://github.com/HlibHav/higgs-agent-factory), an eval gate for voice agents on Higgs Realtime (agent spec → scripted callers → LLM judge → Eval Card). The API differences we ran into along the way are filed in [Boson-Feedback-Collection](https://github.com/boson-ai/Boson-Feedback-Collection) #40–#45; this PR's own gap is [#45](https://github.com/boson-ai/Boson-Feedback-Collection/issues/45).
 
 ## Notes for reviewers
 
@@ -59,3 +61,4 @@ python scripts/run_inference_api.py \
 - `ihbench/config.py` `ModelConfig.make_client` looks like an unused second dispatcher, so I left it alone.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
