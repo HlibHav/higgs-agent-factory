@@ -6,12 +6,6 @@ Higgs Agent Factory turns a one-line brief, or one of the five solution cards on
 
 Boson's homepage says "Agents that coach themselves." This repo is one way to make that claim measurable.
 
-
-
-https://github.com/user-attachments/assets/6ff2ce2a-3144-46d4-b8c0-bf4f3052b3b7
-
-
-
 Built in one day for the Boson AI hackathon in Toronto, 2026-10-24.
 
 ## What it does
