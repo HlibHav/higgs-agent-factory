@@ -39,8 +39,15 @@ flowchart LR
 
 ## Demo video
 
-The 2–3 minute walkthrough is not recorded yet; its link goes here once it is. Until then,
-[Quick start](#quick-start) runs the demo page locally, and [`docs/DEMO-RUNBOOK.md`](docs/DEMO-RUNBOOK.md)
+https://github.com/user-attachments/assets/6ff2ce2a-3144-46d4-b8c0-bf4f3052b3b7
+
+2 minutes 44 seconds, recorded with nobody at the keyboard: a script drives the real demo page,
+the trainee's lines are Higgs TTS 3 fed in as the microphone, and the agent you hear is live
+Higgs Realtime (take 1 of run `20261024T203615Z-34b33d`). Every number on screen has a row in
+[`docs/CLAIMS.md`](docs/CLAIMS.md). The recorder itself is in
+[HlibHav/higgs-agent-factory#2](https://github.com/HlibHav/higgs-agent-factory/pull/2).
+
+To run it yourself, [Quick start](#quick-start) starts the demo page locally, and [`docs/DEMO-RUNBOOK.md`](docs/DEMO-RUNBOOK.md)
 walks through what it shows.
 
 ## Results from live runs
