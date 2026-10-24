@@ -61,11 +61,21 @@ Secrets come from `.env` (template: `.env.example`). Never print a key; check pr
 | Typecheck | `uv run mypy` | none |
 | IHBench client offline tests (fork, test branch) | `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py` | none |
 | IHBench client offline tests on websockets 12.0 (AC-38) | `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/.venv-ws12/bin/python -m pytest /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs/tests/test_higgs_realtime_client.py` | none |
+| Demo film: ffmpeg filters present | `ffmpeg -hide_banner -filters` | none |
+| Demo film graphics typecheck | `npm --prefix demo-film-graphics run typecheck` | none |
+| Demo film graphics tests | `npm --prefix demo-film-graphics test` | none |
+| Demo film live spike (Chromium) | `uv run pytest -m live tests/test_film_spike.py` | Boson API (not in guard) |
+| Demo film live take tests (Chromium) | `uv run pytest -m live tests/test_film_browser.py` | Boson API (not in guard) |
+| Demo film graphics install | `npm --prefix demo-film-graphics ci` | npm registry (not in guard) |
+| Demo film graphics render | `npm --prefix demo-film-graphics run render` | network on first run (not in guard) |
+| Chromium for Playwright | `uv run playwright install chromium` | network (not in guard) |
 | IHBench PR footprint (AC-26, main session only: the guard denies `git -C`) | `git -C /Users/Glebazzz/Claude/PROJECTS/ihbench-higgs diff --name-only upstream/main...feat/higgs-realtime-client` | none, not in guard |
 | Live smoke | `uv run pytest -m live scripts/smoke.py` | Boson API, spends credits |
 
 `.claude/agent-guard.json` lists exactly the commands with no network, so read-only agents
 never spend API credits. `tests/test_scaffold.py` fails if the two lists drift apart.
+The demo film graphics commands need Node >= 22.18: put `/opt/homebrew/bin` first on PATH, because
+`/opt/anaconda3/bin/node` (v20) shadows it.
 
 "Done" follows `engineering-paved-path:verify-done`: the command plus its quoted result line.
 A claim from reading a diff is not done.

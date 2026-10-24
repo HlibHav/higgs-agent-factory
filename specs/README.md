@@ -21,3 +21,4 @@ Normative specs: what a feature must do and why, never how to build it (that is 
 
 - [2026-10-24-higgs-agent-factory.md](2026-10-24-higgs-agent-factory.md) — SPEC-2026-10-24-higgs-agent-factory: Agent Spec, generator, eval gate and Eval Card for voice agents on Higgs Realtime (P1, P2). Status: approved.
 - [2026-10-24-ihbench-higgs-client.md](2026-10-24-ihbench-higgs-client.md) — SPEC-2026-10-24-ihbench-higgs-client: IHBench client for Higgs Realtime, contributed as a PR to `boson-ai/ihbench` (P0). Status: implemented.
+- [2026-10-24-demo-film.md](2026-10-24-demo-film.md) — SPEC-2026-10-24-demo-film: unattended recorder for the 3-minute demo film (TTS stems, synthetic mic, event-driven interruption, take log, claims gate, render). Status: approved.

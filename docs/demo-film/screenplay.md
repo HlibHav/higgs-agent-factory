@@ -37,13 +37,13 @@ Time is the target; the recorder holds each beat for as long as its voice line r
 | # | Time | Picture | Voice |
 |---|---|---|---|
 | 1. Hook | 0–14 | Graphic: the v1 Eval Card, verdict **REJECTED · 4 / 6**, run id `20261024T174839Z-6f4ab3b5`. One low tone. | *"This afternoon we built a voice agent on Higgs Realtime. Our own factory refused to release it."* |
-| 2. The market | 14–36 | Graphic: three layers, MODELS · PLATFORMS · APPS. Boson's row lights across speech-to-speech, text-to-speech and real-time avatar. | *"Voice AI has three layers: the models, the platforms that host agents, and the apps that sell outcomes. Of the companies we compared, Boson is the only one that builds speech-to-speech, text-to-speech and a real-time avatar in house. Between a model like that and an agent a business puts on a call sits one question: is it ready?"* |
+| 2. The market | 14–36 | Graphic: three layers, MODELS · PLATFORMS · APPS. Boson's row lights across speech-to-speech, text-to-speech and real-time avatar. | *"Voice AI has three layers: the models, the platforms that host agents, and the apps that sell outcomes. Of the six voice companies we compared this week, Boson is the only one that builds its own speech-to-speech model, text-to-speech and real-time avatar. Between a model like that and an agent a business puts on a call sits one question: is it ready?"* |
 | 3. The decision | 36–50 | Graphic: "Agents that coach themselves." — boson.ai. Then two lines: A GATE, NOT A BUILDER · ONE TEMPLATE, ALL THE WAY. | *"So we didn't build another agent builder. We built the gate. Boson's own line is 'agents that coach themselves'; we made it something you can check. One template, all the way through, instead of five halfway."* |
 | 4. Skills | 50–65 | Page, section 1: click **Specialist Training**; the persona and the five skills. | *"An agent here isn't one long prompt. It's a persona and five skills: identity check, refund limits, payment secrets, upset customers and a scope guard. Each skill carries its own procedure and its own tests."* |
 | 5. Gate and coach | 65–110 | Page, section 2: the **Coach: before → after** box. Highlight v1 REJECTED 4/6 and the two failed skills, then the rewritten procedures, then v2 RELEASED 6/6 and both run ids. | *"The gate runs every scenario against Higgs Realtime, and Claude Sonnet 5.5 grades each answer twice. Version one: rejected, four of six. It never stated the fifty euro refund limit, and it refused a password request without steering back to the policy. The judge agreed with itself on all six. The coach rewrote only those two procedures, never the tests, and the gate ran again from scratch. Version two: released, six of six, for about a cent of audio. One run, one round, and the coach could see the failing test: its new procedure even quotes the test's thirty euro example. So this shows the loop works, not that the agent generalises."* |
 | 6. Not a rubber stamp | 110–128 | Page: the **From brief: …** card for `brief-onboarding-buddy-b948ed`; its card and coach box, v3 REJECTED 5/6. | *"And the gate is not a rubber stamp. This agent came from one sentence. The coach tried twice, and it is still rejected, so it doesn't ship. One of its scenarios passed, then failed with no edit at all. One run per scenario is noisy, and the card shows it."* |
 | 7. Talk to it | 128–160 | Page, section 3, Specialist Training v2: **Start**, no "not released" banner. The dialogue below, captions on. The live TTFA value with its label stays in frame. **Stop**. | *"Now talk to version two."* … dialogue … *"Its audio stops the moment the trainee cuts in."* |
-| 8. For Boson | 160–180 | GitHub: https://github.com/boson-ai/ihbench/pull/2, then `docs/BOSON-HANDOFF.md`. End card. | *"For Boson: a public client that runs IHBench, Boson's own interruption benchmark, against Boson's own API, open as a pull request. And a log of every rough edge we hit today, handed over. Agents that coach themselves, with a card that says when they're ready."* |
+| 8. For Boson | 160–180 | GitHub: https://github.com/boson-ai/ihbench/pull/2, then `docs/BOSON-HANDOFF.md`. End card. | *"For Boson: a public client that runs IHBench, Boson's own interruption benchmark, against Boson's own API, as a draft pull request to Boson's repo. And a log of every rough edge we hit today, handed over. Agents that coach themselves, with a card that says when they're ready."* |
 
 ### Beat 7 dialogue
 
@@ -67,7 +67,7 @@ dropped.
 v1 `20261024T174839Z-6f4ab3b5` → v2 `20261024T180110Z-b501e4a3`: one coach run, one round ·
 judge Claude Sonnet 5.5, k = 2, self-agreement of one model · the coach saw the failing scenario ·
 brief agent `brief-onboarding-buddy-b948ed`, v1 → v3, one run per scenario · estimated audio cost
-from Boson's published per-minute rates · live TTFA starts at `speech_stopped` and is not the
+from Boson's published per-minute rates · market line: six companies compared on 2026-10-24 (ElevenLabs, Fish Audio, Fin, HeyGen, Synthesia, Beyond Presence), public sources · live TTFA starts at `speech_stopped` and is not the
 card's TTFA · "Agents that coach themselves" is Boson's line (boson.ai, 2026-10-24).
 
 ## Numbers and claims
@@ -80,7 +80,7 @@ card's TTFA · "Agents that coach themselves" is Boson's line (boson.ai, 2026-10
 | Brief agent still rejected after two rounds, noisy scenario | Agent from a brief, gated and coached on the page | ok |
 | Live TTFA on screen | Live-session TTFA | ok, read the label |
 | "Agents that coach themselves" | Boson's pitch | ok, attributed |
-| "Of the companies we compared, Boson is the only one that builds S2S, TTS and a real-time avatar in house" | **none yet** | **add a row before render**: source is Glib's competitor table of 2026-10-24 (six companies: ElevenLabs, Fish Audio, Fin, HeyGen, Synthesia, Beyond Presence), with its links |
+| "Of the six voice companies we compared this week, Boson is the only one that builds its own speech-to-speech model, text-to-speech and real-time avatar" | Boson is the only one of six compared voice companies… | ok (as of 2026-10-24) |
 
 Not in the film: Artificial Analysis numbers and Boson's IHBench number (`conversation-only`),
 the four unreviewed templates, any avatar number, a claim that the coach made the agent faster.

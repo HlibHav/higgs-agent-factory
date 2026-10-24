@@ -1,0 +1,539 @@
+{
+  "LineData": {
+    "$defs": {
+      "Beat": {
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "maximum": 8,
+            "minimum": 1,
+            "title": "Number",
+            "type": "integer"
+          },
+          "id": {
+            "enum": [
+              "hook",
+              "market",
+              "decision",
+              "skills",
+              "gate-coach",
+              "not-rubber-stamp",
+              "talk",
+              "for-boson"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "target_s": {
+            "title": "Target S",
+            "type": "number"
+          },
+          "picture": {
+            "enum": [
+              "graphic",
+              "page",
+              "take",
+              "images+graphic"
+            ],
+            "title": "Picture",
+            "type": "string"
+          },
+          "narrator": {
+            "items": {
+              "$ref": "#/$defs/NarratorLine"
+            },
+            "title": "Narrator",
+            "type": "array"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/$defs/BeatImage"
+            },
+            "title": "Images",
+            "type": "array"
+          }
+        },
+        "required": [
+          "number",
+          "id",
+          "target_s",
+          "picture",
+          "narrator"
+        ],
+        "title": "Beat",
+        "type": "object"
+      },
+      "BeatImage": {
+        "additionalProperties": false,
+        "description": "A still shown in a beat from `at_line` until the next image or the next change.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "at_line": {
+            "title": "At Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path",
+          "at_line"
+        ],
+        "title": "BeatImage",
+        "type": "object"
+      },
+      "ClaimMapping": {
+        "additionalProperties": false,
+        "description": "A number-bearing phrase of a line and the CLAIMS row (its exact \"claim\" cell) that backs\nit. `row` None means unmapped, and the claims gate fails the line.",
+        "properties": {
+          "line_id": {
+            "title": "Line Id",
+            "type": "string"
+          },
+          "phrase": {
+            "title": "Phrase",
+            "type": "string"
+          },
+          "row": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row"
+          }
+        },
+        "required": [
+          "line_id",
+          "phrase",
+          "row"
+        ],
+        "title": "ClaimMapping",
+        "type": "object"
+      },
+      "DialogueLine": {
+        "additionalProperties": false,
+        "description": "A trainee line fed in as the microphone; also captioned while it plays (AC-40).",
+        "properties": {
+          "id": {
+            "enum": [
+              "T1",
+              "T2"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "DialogueLine",
+        "type": "object"
+      },
+      "Exemption": {
+        "additionalProperties": false,
+        "description": "A rhetorical number word (\"three layers\") that is not a claim. The claims gate passes\na number word only inside a listed exemption; each one carries its reason.",
+        "properties": {
+          "line_id": {
+            "title": "Line Id",
+            "type": "string"
+          },
+          "phrase": {
+            "title": "Phrase",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "phrase",
+          "reason"
+        ],
+        "title": "Exemption",
+        "type": "object"
+      },
+      "Graphic": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "enum": [
+              "hook",
+              "market",
+              "decision",
+              "end-card"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "beat": {
+            "maximum": 8,
+            "minimum": 1,
+            "title": "Beat",
+            "type": "integer"
+          },
+          "starts_at_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At Line"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/$defs/GraphicItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "cues": {
+            "items": {
+              "$ref": "#/$defs/GraphicCue"
+            },
+            "title": "Cues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "beat",
+          "starts_at_line",
+          "items",
+          "cues"
+        ],
+        "title": "Graphic",
+        "type": "object"
+      },
+      "GraphicCue": {
+        "additionalProperties": false,
+        "description": "A graphic element that starts when the narrator sentence `at_line` starts.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "at_line": {
+            "title": "At Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at_line"
+        ],
+        "title": "GraphicCue",
+        "type": "object"
+      },
+      "GraphicItem": {
+        "additionalProperties": false,
+        "description": "A piece of text a graphic shows. Its claims line id is `<graphic id>/<item id>`.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "GraphicItem",
+        "type": "object"
+      },
+      "Highlight": {
+        "additionalProperties": false,
+        "description": "A beat 5 highlight on the recorded page, shown when `at_line` starts. `target` is a\nPlaywright locator on the coach box.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "beat": {
+            "const": 5,
+            "title": "Beat",
+            "type": "integer"
+          },
+          "at_line": {
+            "title": "At Line",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "beat",
+          "at_line",
+          "target"
+        ],
+        "title": "Highlight",
+        "type": "object"
+      },
+      "NarratorLine": {
+        "additionalProperties": false,
+        "description": "One narrator sentence, one TTS stem, one caption. Ids are `b<n>-s<k>`, or `b7-intro`\nand `b7-outro` for beat 7.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "NarratorLine",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "beats": {
+        "items": {
+          "$ref": "#/$defs/Beat"
+        },
+        "title": "Beats",
+        "type": "array"
+      },
+      "dialogue": {
+        "items": {
+          "$ref": "#/$defs/DialogueLine"
+        },
+        "title": "Dialogue",
+        "type": "array"
+      },
+      "graphics": {
+        "items": {
+          "$ref": "#/$defs/Graphic"
+        },
+        "title": "Graphics",
+        "type": "array"
+      },
+      "claims": {
+        "items": {
+          "$ref": "#/$defs/ClaimMapping"
+        },
+        "title": "Claims",
+        "type": "array"
+      },
+      "exemptions": {
+        "items": {
+          "$ref": "#/$defs/Exemption"
+        },
+        "title": "Exemptions",
+        "type": "array"
+      },
+      "highlights": {
+        "items": {
+          "$ref": "#/$defs/Highlight"
+        },
+        "title": "Highlights",
+        "type": "array"
+      },
+      "interrupted_caption": {
+        "title": "Interrupted Caption",
+        "type": "string"
+      }
+    },
+    "required": [
+      "schema_version",
+      "beats",
+      "dialogue",
+      "graphics",
+      "claims",
+      "exemptions",
+      "highlights",
+      "interrupted_caption"
+    ],
+    "title": "LineData",
+    "type": "object"
+  },
+  "Timeline": {
+    "$defs": {
+      "CaptionCue": {
+        "additionalProperties": false,
+        "description": "One caption on the film's clock. `text` is complete, so the caption overlay needs no\nlookup: narrator sentences and caller lines copy `lines.json`, the interrupted reply to T1\nis `LineData.interrupted_caption`, and `reply` (the reply to T2) is the text the page\nreceived, shown as plain text. Frames are on the film's clock, `end_frame` exclusive.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "narrator",
+              "caller",
+              "interrupted",
+              "reply"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "start_frame": {
+            "minimum": 0,
+            "title": "Start Frame",
+            "type": "integer"
+          },
+          "end_frame": {
+            "minimum": 0,
+            "title": "End Frame",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "text",
+          "start_frame",
+          "end_frame"
+        ],
+        "title": "CaptionCue",
+        "type": "object"
+      },
+      "Cue": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "frame": {
+            "title": "Frame",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "frame"
+        ],
+        "title": "Cue",
+        "type": "object"
+      },
+      "GraphicSlot": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "enum": [
+              "hook",
+              "market",
+              "decision",
+              "end-card"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "frames": {
+            "title": "Frames",
+            "type": "integer"
+          },
+          "cues": {
+            "items": {
+              "$ref": "#/$defs/Cue"
+            },
+            "title": "Cues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "frames",
+          "cues"
+        ],
+        "title": "GraphicSlot",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "Written by `factory.film timeline` to `results/film/timeline.json`; read by Remotion.",
+    "properties": {
+      "schema_version": {
+        "const": 1,
+        "title": "Schema Version",
+        "type": "integer"
+      },
+      "fps": {
+        "const": 30,
+        "title": "Fps",
+        "type": "integer"
+      },
+      "width": {
+        "const": 1920,
+        "title": "Width",
+        "type": "integer"
+      },
+      "height": {
+        "const": 1080,
+        "title": "Height",
+        "type": "integer"
+      },
+      "total_frames": {
+        "minimum": 1,
+        "title": "Total Frames",
+        "type": "integer"
+      },
+      "graphics": {
+        "items": {
+          "$ref": "#/$defs/GraphicSlot"
+        },
+        "title": "Graphics",
+        "type": "array"
+      },
+      "captions": {
+        "items": {
+          "$ref": "#/$defs/CaptionCue"
+        },
+        "title": "Captions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "schema_version",
+      "fps",
+      "width",
+      "height",
+      "total_frames",
+      "graphics",
+      "captions"
+    ],
+    "title": "Timeline",
+    "type": "object"
+  }
+}

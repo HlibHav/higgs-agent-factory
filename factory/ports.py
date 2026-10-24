@@ -111,6 +111,11 @@ class TtsError(Exception):
     """Text-to-speech synthesis failed."""
 
 
+class TtsRateLimited(TtsError):
+    """TTS answered 429 (F26: no Retry-After). A `TtsError`, so callers that do not retry are
+    unchanged."""
+
+
 class RealtimeSession(Protocol):
     async def open(self, spec: AgentSpec) -> None: ...
 

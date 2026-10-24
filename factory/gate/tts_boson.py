@@ -2,10 +2,10 @@
 
 import httpx
 
-from factory.ports import TtsError
+from factory.ports import TtsError, TtsRateLimited
 
 _SPEECH_PATH = "/v1/audio/speech"  # F22
-_MODEL = "higgs-tts-3"  # F26: documented as optional, but the live API rejects a missing model
+TTS_MODEL = "higgs-tts-3"  # F26: documented as optional, but the live API rejects a missing model
 
 
 class BosonTts:
@@ -14,14 +14,19 @@ class BosonTts:
     `client` is built by the composition root with the Boson API base URL.
     """
 
-    def __init__(self, client: httpx.AsyncClient, api_key: str) -> None:
+    def __init__(self, client: httpx.AsyncClient, api_key: str, model: str = TTS_MODEL) -> None:
         self._client = client
         self._api_key = api_key
+        self._model = model
+
+    @property
+    def model(self) -> str:
+        return self._model
 
     async def synthesise(self, text: str, voice: str) -> bytes:
         # F22: `stream: true` requires `pcm` and yields raw 16-bit / 24 kHz / mono PCM.
         payload = {
-            "model": _MODEL,
+            "model": self._model,
             "input": text,
             "voice": voice,
             "response_format": "pcm",
@@ -32,6 +37,8 @@ class BosonTts:
             async with self._client.stream(
                 "POST", _SPEECH_PATH, json=payload, headers=headers
             ) as response:
+                if response.status_code == 429:  # F26
+                    raise TtsRateLimited("TTS request refused with status 429")
                 if response.status_code != 200:
                     raise TtsError(f"TTS request failed with status {response.status_code}")
                 pcm = b"".join([chunk async for chunk in response.aiter_bytes()])
