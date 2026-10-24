@@ -21,11 +21,11 @@ Last refreshed: 2026-10-24T16:10:00Z by setup session (Claude Code) — verified
 
 ## Blocked
 
-- Opening the draft PR to `boson-ai/ihbench` waits for Glib's explicit OK. Branches are pushed to `HlibHav/ihbench`.
+- The PR to `boson-ai/ihbench` is opened only as the final step, on Glib's word (his rule: everything lives in his repos until we finish). Until then the draft is internal: https://github.com/HlibHav/ihbench/pull/1 (`feat/higgs-realtime-client` → fork `main`, 3 files).
 - The repo's own live smoke (`uv run pytest -m live scripts/smoke.py`) is red by design: it asserts the documented `usage: null`, but the wire returned `usage` (F2). Decide whether it should assert the docs claim or the observed behaviour.
 
 ## Next
 
-- P0: Glib's OK → open the draft PR from `HlibHav/ihbench:feat/higgs-realtime-client` to `boson-ai/ihbench:main` with the description the plan lists (step 8).
+- P0 final: when Glib says we are done, open the PR from `HlibHav/ihbench:feat/higgs-realtime-client` to `boson-ai/ihbench:main`, reusing the description of HlibHav/ihbench#1.
 - P1: run lane 0 of `docs/plans/2026-10-24-higgs-agent-factory.md`, then L1, L2 (starts with the 30-minute pipecat tap spike), L3r and L3c in parallel, then J. Glib reviews the Specialist Training rubrics before the stage gate run.
 - The first audio-mode gate run records in `docs/boson-protocol.md` whether `usage` arrives in audio mode and whether `input_tokens` includes cached tokens.
