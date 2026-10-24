@@ -38,9 +38,13 @@ Last refreshed: 2026-10-24T19:05:00Z by the setup session (Claude Code) on `docs
 
 - Nothing running.
 
+## Submitted
+
+- Hackathon form submitted by Glib, 2026-10-24: track Agents That Act, judged tag `hackathon-submission` = `68b66ba`. The demo video field points at README `#demo-video`, which says the video follows; host the video outside Git (YouTube unlisted or Drive) and link it there.
+
 ## Blocked (Glib)
 
-- Record the demo (`docs/DEMO-RUNBOOK.md`). Check the avatar with headphones first.
+- Record the demo: screenplay draft `docs/demo-film/screenplay.md` (no human at the keyboard, Higgs TTS voices, no avatar). Before render it needs a CLAIMS row for the market line.
 - Review the four template rubrics before any of them is shown.
 
 ## Next
