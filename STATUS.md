@@ -1,19 +1,16 @@
 # Status
 
-Last refreshed: 2026-10-24T16:10:00Z by setup session (Claude Code) — verified by: `.venv/bin/python scripts/run_inference_api.py --config configs/higgs-realtime.yaml --max-workers 1 --limit 10 --output responses/higgs-realtime.jsonl` (fork) → `Done. 10 responses saved to responses/higgs-realtime.jsonl, 0 failures.`
+Last refreshed: 2026-10-24T16:45:00Z by setup session (Claude Code) — verified by: `uv run python -m factory gate --template specialist-training` → `Verdict: rejected`, `Scenarios run: 6, pass rate: 83%` (run `20261024T164057Z-9e2ee667`)
 
 ## Works now
 
-- Repo conventions are gated offline: `uv run pytest -m "not live"` → `4 passed` (protocol facts carry a source and tag, guard list matches the Check table, `AGENTS.md` symlink, INSIGHTS sections).
-- Lint and format are clean: `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `19 files already formatted`.
-- Public repo: `gh repo view HlibHav/higgs-agent-factory --json visibility` → `PUBLIC`.
-- P0 IHBench client, offline: in the fork `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs`, `.venv/bin/python -m pytest tests/test_higgs_realtime_client.py` → `50 passed` (websockets 17.3) and `.venv-ws12/bin/python -m pytest tests/test_higgs_realtime_client.py` → `50 passed` (websockets 12.0).
-- P0 PR footprint (AC-26): `git -C …/ihbench-higgs diff --name-only upstream/main...feat/higgs-realtime-client` → exactly `configs/higgs-realtime.yaml`, `ihbench/clients/higgs_realtime_client.py`, `scripts/run_inference_api.py`; runner diff is one changed choices line plus one `elif` block.
-- P0 live (AC-14): `tests/live_replay_order.py` → three audio commits, every `previous_item_id` matches, no response before `response.create` (`results/ac14-20261024T153754Z.jsonl`; F24, F25 now VERIFIED-RUN).
-- P0 live smoke (AC-28…32): 10 rows, all five keys, all responses non-empty (53–561 chars, 4 interruption types), `0 failures`, 0 `higgs-realtime attempt failed:` lines.
-- A Higgs Realtime text session works end to end: `uv run pytest -m live scripts/smoke.py` connected and streamed text (`results/smoke-20261024T145225Z.jsonl`). F1, F5 and F14's first ack are VERIFIED-RUN.
-- Specs approved (Glib, in chat): `specs/2026-10-24-ihbench-higgs-client.md` (planned, implemented in the fork) and `specs/2026-10-24-higgs-agent-factory.md` (planned: `docs/plans/2026-10-24-higgs-agent-factory.md`, multi-agent).
-- Decisions recorded: `docs/architecture-decisions/` (judge and generator model, dependencies, thin WS fallback for the gate), all accepted by Glib.
+- Offline gate on `feat/agent-factory-p1`: `uv run pytest -m "not live" -p no:logging` → `179 passed, 1 deselected, 4 xfailed`; `uv run ruff check` → `All checks passed!`; `uv run ruff format --check` → `67 files already formatted`.
+- P1 live gate, Specialist Training: `uv run python -m factory gate --template specialist-training` (keys in env) → `rejected`, 5/6 PASS, st-6 PARTIAL; TTFA p50 853 ms / p95 1,164 ms (n = 7); barge-in 272 ms (n = 1); one response per turn; estimated audio $0.0116; tokens 2,071 in / 1,840 cached / 155 out. Card copied to `docs/evidence/eval-card-20261024T164057Z-9e2ee667.{json,txt}`.
+- Scenario isolation and turn end (AC-55…61): each scenario has its own session; a turn ends after 2 s with no new response; `Responses per turn` is on the card.
+- Judge-invalid diagnostics (AC-62…64): an invalid judge reply is kept (≤ 2,000 chars, truncated flag) with the transcript length, in the record and stored card; never rendered.
+- P0 IHBench client (fork `/Users/Glebazzz/Claude/PROJECTS/ihbench-higgs`): `50 passed` on websockets 17.3 and 12.0; AC-26 footprint = 3 files; live AC-14 replay order MATCH; live smoke `Done. 10 responses saved to responses/higgs-realtime.jsonl, 0 failures.` Internal draft PR: https://github.com/HlibHav/ihbench/pull/1.
+- Repo is public: https://github.com/HlibHav/higgs-agent-factory (`main` + `feat/agent-factory-p1`).
+- Protocol facts F1–F27 in `docs/boson-protocol.md`; live-verified: F1, F5, F14, F18, F23, F24, F25, F26, F27; F2 is "docs and wire disagree" (usage is reported, audio mode included).
 
 ## In progress
 
@@ -21,11 +18,12 @@ Last refreshed: 2026-10-24T16:10:00Z by setup session (Claude Code) — verified
 
 ## Blocked
 
-- The PR to `boson-ai/ihbench` is opened only as the final step, on Glib's word (his rule: everything lives in his repos until we finish). Until then the draft is internal: https://github.com/HlibHav/ihbench/pull/1 (`feat/higgs-realtime-client` → fork `main`, 3 files).
-- The repo's own live smoke (`uv run pytest -m live scripts/smoke.py`) is red by design: it asserts the documented `usage: null`, but the wire returned `usage` (F2). Decide whether it should assert the docs claim or the observed behaviour.
+- The PR to `boson-ai/ihbench` is opened only as the final step, on Glib's word. Until then: HlibHav/ihbench#1.
+- The repo's own `uv run pytest -m live scripts/smoke.py` is red by design: it asserts the documented `usage: null`, and the wire returns usage (F2). Glib to decide whether it should assert the docs or the wire.
 
 ## Next
 
-- P0 final: when Glib says we are done, open the PR from `HlibHav/ihbench:feat/higgs-realtime-client` to `boson-ai/ihbench:main`, reusing the description of HlibHav/ihbench#1.
-- P1: run lane 0 of `docs/plans/2026-10-24-higgs-agent-factory.md`, then L1, L2 (starts with the 30-minute pipecat tap spike), L3r and L3c in parallel, then J. Glib reviews the Specialist Training rubrics before the stage gate run.
-- The first audio-mode gate run records in `docs/boson-protocol.md` whether `usage` arrives in audio mode and whether `input_tokens` includes cached tokens.
+- `judge reply invalid` on st-1 happened in 2 of 7 live runs and has not reproduced since; the next occurrence leaves the raw reply in the stored card (AC-62) — read it and record the cause.
+- P2 demo page (plan steps 25–28) if wanted; L5 avatar is unplanned.
+- Merge `feat/agent-factory-p1` into `main` after review; P0 final PR to Boson when Glib says we're done.
+- Measured token dollar cost (plan step 21b) waits on whether `input_tokens` includes cached tokens (F2).
