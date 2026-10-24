@@ -13,6 +13,8 @@ Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch
 - Glib's decisions 2026-10-24: composition root on the SDK allow-list (A1 closed); the websockets 12–13 redirect caveat is documented in the PR body; IHBench spec `Status: implemented`; branch merged into `main`.
 - Hand-off for Boson: `docs/BOSON-HANDOFF.md`. Demo runbook: `docs/DEMO-RUNBOOK.md`. Upstream PR body and command: `docs/ihbench-pr/` (not run).
 
+- Upstream PR opened by Glib, 2026-10-24: https://github.com/boson-ai/ihbench/pull/2 (from `HlibHav:feat/higgs-realtime-client`).
+
 ## In progress
 
 - Nothing running.
@@ -20,7 +22,6 @@ Last refreshed: 2026-10-24T17:20:00Z by finalize session (Claude Code) on branch
 ## Blocked (Glib)
 
 - Record the demo (`docs/DEMO-RUNBOOK.md`).
-- "Push to Boson": `I_AM_GLIB_AND_SAID_PUSH_TO_BOSON=yes bash docs/ihbench-pr/create-pr.sh`.
 - Review the four template rubrics before any of them is shown.
 
 ## Next
