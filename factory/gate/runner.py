@@ -283,7 +283,8 @@ class _Run:
                     scenario.user_turns[index], scenario.user_voice, label=label
                 )
             except AudioMissing as exc:
-                raise _Stop("audio missing", exc.turn_label) from exc
+                detail = f"{exc.turn_label}: {exc.cause}" if exc.cause else exc.turn_label
+                raise _Stop("audio missing", detail) from exc
         return cache[index]
 
     async def _scenario(self, scenario: Scenario) -> None:

@@ -200,7 +200,7 @@ def test_ac10_no_audio_incomplete_names_turn(tmp_path: Path) -> None:
     h = Harness(tmp_path, make_spec(), reply(), [GOOD], tts=FakeTts(fail_texts={"Hello there."}))
     record = h.run()
     assert record.cause == "audio missing"
-    assert record.cause_detail == "s1 turn 1"
+    assert record.cause_detail == "s1 turn 1: fake TTS failure for 'Hello there.'"
     assert record.scenarios == [] and h.judge.requests == []
     assert h.factory.sessions[0].sends == []
 

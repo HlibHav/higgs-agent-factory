@@ -69,6 +69,7 @@ def test_failed_synthesis_is_not_cached(tmp_path: Path) -> None:
     with pytest.raises(AudioMissing) as info:
         asyncio.run(source.audio_for(UserTurn(text="boom"), "chloe", label="s1 turn 1"))
     assert info.value.turn_label == "s1 turn 1"
+    assert info.value.cause == "fake TTS failure for 'boom'"
     assert not list((tmp_path / "cache").glob("*.pcm"))
 
 
@@ -139,7 +140,8 @@ def test_boson_tts_request_shape_and_pcm_body() -> None:
         "voice": "chloe",
         "response_format": "pcm",
         "stream": True,
-    }  # F22
+        "model": "higgs-tts-3",
+    }  # F22, F26
 
 
 def test_boson_tts_error_status_raises_without_key_and_without_retry() -> None:

@@ -21,9 +21,10 @@ _PCM_CHANNELS = 1
 class AudioMissing(Exception):
     """A scripted turn has neither synthesised nor recorded audio (AC-10)."""
 
-    def __init__(self, turn_label: str) -> None:
+    def __init__(self, turn_label: str, cause: str | None = None) -> None:
         super().__init__(f"no audio for {turn_label}")
         self.turn_label = turn_label
+        self.cause = cause  # the key-free `TtsError` text, when synthesis failed
 
 
 class TurnAudioSource:
@@ -39,16 +40,18 @@ class TurnAudioSource:
         cached = self._read_cache(turn.text, voice)
         if cached is not None:
             return cached, "synthesised"
+        tts_error: str | None = None
         try:
             pcm = await self._tts.synthesise(turn.text, voice)
-        except TtsError:
+        except TtsError as exc:
             pcm = b""
+            tts_error = str(exc)
         if pcm:
             self._write_cache(turn.text, voice, pcm)
             return pcm, "synthesised"
         recorded = self._read_recording(turn.recording)
         if recorded is None:
-            raise AudioMissing(label)
+            raise AudioMissing(label, tts_error)
         return recorded, "recorded"
 
     def _cache_path(self, text: str, voice: str) -> Path:

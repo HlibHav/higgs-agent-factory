@@ -5,6 +5,7 @@ import httpx
 from factory.ports import TtsError
 
 _SPEECH_PATH = "/v1/audio/speech"  # F22
+_MODEL = "higgs-tts-3"  # F26: documented as optional, but the live API rejects a missing model
 
 
 class BosonTts:
@@ -19,7 +20,13 @@ class BosonTts:
 
     async def synthesise(self, text: str, voice: str) -> bytes:
         # F22: `stream: true` requires `pcm` and yields raw 16-bit / 24 kHz / mono PCM.
-        payload = {"input": text, "voice": voice, "response_format": "pcm", "stream": True}
+        payload = {
+            "model": _MODEL,
+            "input": text,
+            "voice": voice,
+            "response_format": "pcm",
+            "stream": True,
+        }
         headers = {"Authorization": f"Bearer {self._api_key}"}
         try:
             async with self._client.stream(
