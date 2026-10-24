@@ -40,6 +40,12 @@ class TranscriptDelta:
 
 
 @dataclass(frozen=True)
+class ResponseCreated:
+    response_id: str
+    t: float
+
+
+@dataclass(frozen=True)
 class ResponseDone:
     response_id: str
     status: str
@@ -81,7 +87,8 @@ class OtherEvent:
 
 
 SessionEvent = (
-    AudioDelta
+    ResponseCreated
+    | AudioDelta
     | TranscriptDelta
     | ResponseDone
     | ToolCall

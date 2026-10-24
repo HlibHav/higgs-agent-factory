@@ -16,6 +16,7 @@ from factory.agent_spec.validation import validate_agent_spec
 from factory.ports import (
     AudioDelta,
     OtherEvent,
+    ResponseCreated,
     ResponseDone,
     SessionEnded,
     SessionEvent,
@@ -412,3 +413,22 @@ def test_timestamps_use_injected_clock() -> None:
 
     events = asyncio.run(main())
     assert all(float(e.t).is_integer() and e.t >= 100 for e in events)
+
+
+def test_response_created_maps_to_event() -> None:
+    created = {
+        "event_id": "fake-created-r1",
+        "type": "response.created",
+        "response": {"id": "r1", "object": "realtime.response", "status": "in_progress"},
+        "metadata": None,
+    }
+    script = [wait_for("session.update"), delay(50), send(created), delay(50), close(1000)]
+
+    async def body(session: BosonRealtimeSession, received: list[Received]) -> Any:
+        await session.open(_spec())
+        return await _collect(session)
+
+    events = _run(script, body)
+    assert isinstance(events[0], ResponseCreated)  # F17
+    assert events[0].response_id == "r1"
+    assert isinstance(events[0].t, float)

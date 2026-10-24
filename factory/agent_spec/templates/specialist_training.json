@@ -137,7 +137,7 @@
           "interrupt_after_assistant_ms": null
         },
         {
-          "text": "Sorry, wait. What comes first, the apology or the fix?",
+          "text": "Which comes first with an angry customer, the apology or the fix?",
           "recording": null,
           "interrupt_after_assistant_ms": 1500
         }

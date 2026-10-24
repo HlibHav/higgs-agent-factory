@@ -3,11 +3,14 @@
 import asyncio
 from pathlib import Path
 
+import pytest
+
+from factory.gate import runner
 from factory.gate.playback import CHUNK_MS, play_turn, stream_silence_until, ttfa_ms
 from factory.gate.runner import preflight, run_gate
 from factory.gate.tts_cache import TurnAudioSource
 from factory.ports import AudioDelta, ResponseDone, TranscriptDelta
-from tests.doubles import FakeJudge, FakeSession, FakeSessionFactory, make_spec
+from tests.doubles import Delay, FakeJudge, FakeSession, FakeSessionFactory, make_spec
 
 BYTES_PER_S = 48_000  # 24 kHz s16le mono (F4)
 
@@ -160,10 +163,14 @@ def test_ac28_bargein_stop_time(tmp_path: Path) -> None:
     assert len(interrupting) == 1  # played once, over the reply, not again afterwards
 
 
-def test_ac28_reply_too_short_to_interrupt_is_not_measured(tmp_path: Path) -> None:
+def test_ac28_reply_too_short_to_interrupt_is_not_measured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runner, "QUIET_WINDOW_S", 0.05)  # AC-57: r1's turn ends after the window
     script = [
         AudioDelta("r1", 4800, 1000.05),  # only 100 ms before the reply is done
         ResponseDone("r1", "completed", None, 1000.10),
+        Delay(0.2),  # longer than the shrunk quiet window: r2 answers the second turn
         AudioDelta("r2", 4800, 1000.50),
         ResponseDone("r2", "completed", None, 1000.60),
     ]

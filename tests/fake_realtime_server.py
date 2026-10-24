@@ -27,6 +27,7 @@ from websockets.exceptions import ConnectionClosed
 class Received:
     event: dict[str, Any]
     t: float  # time.monotonic() on receipt
+    conn: int = 0  # index of the connection that sent it
 
 
 @dataclass(frozen=True)
@@ -178,12 +179,23 @@ def idle_timeout_event() -> dict[str, Any]:
 
 @asynccontextmanager
 async def fake_realtime_server(
-    script: list[Action], *, auto_ack: bool = True
+    script: list[Action] | None = None,
+    *,
+    scripts: list[list[Action]] | None = None,
+    auto_ack: bool = True,
 ) -> AsyncIterator[tuple[str, list[Received]]]:
     received: list[Received] = []
     arrived = asyncio.Event()
+    connections = 0
 
     async def handler(ws: ServerConnection) -> None:
+        nonlocal connections
+        conn = connections
+        connections += 1
+        actions = script or []
+        if scripts is not None:
+            actions = scripts[conn] if conn < len(scripts) else []
+        mine: list[Received] = []
         acked = False
 
         async def reader() -> None:
@@ -191,7 +203,9 @@ async def fake_realtime_server(
             try:
                 async for raw in ws:
                     event = json.loads(raw)
-                    received.append(Received(event, time.monotonic()))
+                    item = Received(event, time.monotonic(), conn)
+                    received.append(item)
+                    mine.append(item)
                     arrived.set()
                     if auto_ack and not acked and event.get("type") == "session.update":
                         acked = True
@@ -204,7 +218,7 @@ async def fake_realtime_server(
         reader_task = asyncio.create_task(reader())
         cursor = 0
         try:
-            for action in script:
+            for action in actions:
                 if isinstance(action, _Send):
                     await ws.send(json.dumps(action.event))
                 elif isinstance(action, _Delay):
@@ -217,8 +231,8 @@ async def fake_realtime_server(
                         match = next(
                             (
                                 i
-                                for i in range(cursor, len(received))
-                                if received[i].event.get("type") == action.event_type
+                                for i in range(cursor, len(mine))
+                                if mine[i].event.get("type") == action.event_type
                             ),
                             None,
                         )

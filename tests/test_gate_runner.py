@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 import wave
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,10 @@ from typing import Any
 import pytest
 
 from factory.agent_spec.models import AgentSpec, ArgCase, ClientTool, ExpectedCall, MockBehaviour
+from factory.gate import runner
+from factory.gate.card_builder import build_card
 from factory.gate.records import GateRunRecord
+from factory.gate.render import render_card_text
 from factory.gate.runner import (
     GateAborted,
     GateRefused,
@@ -22,13 +26,14 @@ from factory.gate.tts_cache import TurnAudioSource
 from factory.ports import (
     AudioDelta,
     OtherEvent,
+    ResponseCreated,
     ResponseDone,
     SessionEnded,
     ToolCall,
     TranscriptDelta,
     Usage,
 )
-from tests.doubles import FakeJudge, FakeSessionFactory, FakeTts, Refuse, make_spec
+from tests.doubles import Delay, FakeJudge, FakeSessionFactory, FakeTts, Refuse, make_spec
 
 GOOD = json.dumps({"label": "PASS", "rationale": "ok", "evidence": "Hello"})
 BAD = json.dumps({"label": "MAYBE"})
@@ -45,6 +50,12 @@ class FakeClock:
     async def sleep(self, seconds: float) -> None:
         self.now += seconds
         await asyncio.sleep(0)  # yield like a real sleep, so the silence task shares the loop
+
+
+@pytest.fixture(autouse=True)
+def _short_quiet_window(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    if request.node.get_closest_marker("real_window") is None:
+        monkeypatch.setattr(runner, "QUIET_WINDOW_S", 0.05)
 
 
 def test_ac4_missing_budget_refused_no_session(session_factory: FakeSessionFactory) -> None:
@@ -139,10 +150,16 @@ class Harness:
         script: list,
         judge_replies: list[str],
         tts: FakeTts | None = None,
+        *,
+        scripts: list[list] | None = None,
+        restamp: bool = False,
+        real_time: bool = False,
     ) -> None:
         self.clock = FakeClock()
+        self.now = time.monotonic if real_time else self.clock
+        self.sleep = asyncio.sleep if real_time else self.clock.sleep
         self.spec: AgentSpec = preflight(raw)
-        self.factory = FakeSessionFactory(script, clock=self.clock)
+        self.factory = FakeSessionFactory(script, clock=self.now, scripts=scripts, restamp=restamp)
         self.tts = tts or FakeTts()
         self.judge = FakeJudge(judge_replies)
         self.audio = TurnAudioSource(self.tts, tmp_path / "cache", tmp_path / "rec")
@@ -154,7 +171,7 @@ class Harness:
                 sessions=self.factory,
                 audio=self.audio,
                 judge=self.judge,
-                sleep=self.clock.sleep,
+                sleep=self.sleep,
             )
         )
 
@@ -174,7 +191,7 @@ def test_happy_path_records_scenario_ttfa_usage_and_audio(tmp_path: Path) -> Non
     assert record.usages == [usage]
     assert record.input_audio_s >= 4800 / BYTES_PER_S  # the turn plus whatever silence ran
     assert record.output_audio_s == pytest.approx(4800 / BYTES_PER_S)
-    assert h.factory.calls == 1 and h.factory.sessions[0].closed  # one session per run
+    assert h.factory.calls == len(h.spec.scenarios) and h.factory.sessions[0].closed  # AC-55
     assert len(h.judge.requests) == 1
     assert h.judge.requests[0].user_turns == ["Hello there."]
 
@@ -242,7 +259,8 @@ def test_session_end_causes_are_incomplete(
 
 def test_ac14_quota_refused_incomplete(tmp_path: Path) -> None:
     ended = SessionEnded("quota refused", 4429, "insufficient_quota", 1000.2)
-    record = Harness(tmp_path, two_scenarios(), reply("r1") + [ended], [GOOD]).run()
+    h = Harness(tmp_path, two_scenarios(), [], [GOOD], scripts=[reply("r1"), [ended]])
+    record = h.run()
     assert record.cause == "quota refused"
     assert len(record.scenarios) == 1  # the first scenario finished and was judged
 
@@ -386,3 +404,172 @@ def test_ac23_record_carries_match_and_never_changes_the_label(tmp_path: Path) -
     assert missed.scenarios[0].judgment.label == "PASS"  # AC-19: the judge's label stands
     plain = Harness(tmp_path, make_spec(), reply(), [GOOD]).run()
     assert plain.scenarios[0].expected_call_match is None
+
+
+# --- one session per scenario (16d, AC-55, AC-56) -------------------------------------------
+
+
+class LetterTts(FakeTts):
+    """PCM derived from the text: the first letter's code, `seconds` long."""
+
+    def __init__(self, seconds: float = 0.1) -> None:
+        super().__init__()
+        self.seconds = seconds
+
+    async def synthesise(self, text: str, voice: str) -> bytes:
+        self.requests.append((text, voice))
+        return bytes([ord(text[0]), 0]) * int(24000 * self.seconds)
+
+
+def _three_scenarios(texts: list[str]) -> dict[str, Any]:
+    raw = make_spec()
+    base = raw["scenarios"][0]
+    raw["scenarios"] = [
+        {**base, "id": f"s{i + 1}", "user_turns": [{"text": text}]} for i, text in enumerate(texts)
+    ]
+    return raw
+
+
+def test_ac55_one_session_per_scenario(tmp_path: Path) -> None:
+    texts = ["Alpha one.", "Bravo two.", "Charlie three."]
+    scripts = [reply(f"r{i}", text=f"reply-{i}") for i in (1, 2, 3)]
+    h = Harness(tmp_path, _three_scenarios(texts), [], [GOOD] * 3, tts=LetterTts(), scripts=scripts)
+    record = h.run()
+    assert record.cause is None and len(record.scenarios) == 3
+    assert h.factory.calls == 3
+    assert all(session.closed for session in h.factory.sessions)
+    for session, text in zip(h.factory.sessions, texts, strict=True):
+        speech = {s.pcm for s in session.sends if s.pcm and any(s.pcm)}
+        assert speech == {bytes([ord(text[0]), 0]) * 2400}  # only its own scenario's speech
+    assert [r.transcript for r in h.judge.requests] == ["reply-1", "reply-2", "reply-3"]
+
+
+def test_ac56_budget_sums_across_sessions(tmp_path: Path) -> None:
+    raw = _three_scenarios(["Alpha one.", "Bravo two.", "Charlie three."])
+    raw["budget"]["max_audio_s_per_run"] = 10.0
+    scripts = [reply(f"r{i}") for i in (1, 2, 3)]
+    h = Harness(tmp_path, raw, [], [GOOD] * 3, tts=LetterTts(4.0), scripts=scripts)
+    record = h.run()
+    assert record.cause == "budget reached"
+    assert len(record.scenarios) == 2
+    assert h.factory.calls == 3  # the stop happened inside the third
+    assert record.input_audio_s + record.output_audio_s >= 10.0 - 0.01
+
+
+# --- quiet window (16e, AC-57, AC-58, AC-60) ------------------------------------------------
+
+
+def _created(rid: str) -> ResponseCreated:
+    return ResponseCreated(rid, 0.0)
+
+
+def _response(rid: str, text: str = "") -> list:
+    items: list = [_created(rid), AudioDelta(rid, 4800, 0.0)]
+    if text:
+        items.append(TranscriptDelta(rid, text, 0.0))
+    return [*items, ResponseDone(rid, "completed", None, 0.0)]
+
+
+@pytest.mark.real_window
+def test_quiet_window_default_is_two_seconds() -> None:
+    assert runner.QUIET_WINDOW_S == 2.0
+
+
+@pytest.mark.real_window
+def test_ac57_turn_ends_two_seconds_after_last_response(tmp_path: Path) -> None:
+    raw = make_spec()
+    raw["scenarios"][0]["user_turns"] = [{"text": "Alpha one."}, {"text": "Bravo two."}]
+    script = [*_response("A"), Delay(1.2), *_response("B"), Delay(3.0), *_response("C")]
+    h = Harness(tmp_path, raw, script, [GOOD], tts=LetterTts(), restamp=True, real_time=True)
+    record = h.run()
+    assert record.cause is None
+    sends = h.factory.sessions[0].sends
+    first = next(s for s in sends if s.pcm and s.pcm[0] == ord("A"))
+    second = next(s for s in sends if s.pcm and s.pcm[0] == ord("B"))
+    b_done = first.t + 1.2  # the stream starts with the first send, give or take a few ms
+    assert second.t >= b_done + 2.0 - 0.1
+    assert second.t - first.t > 2.0 + 0.5  # not within 2 s of A's done
+
+
+@pytest.mark.real_window
+def test_ac58_split_reply_joined_for_its_own_scenario_only(tmp_path: Path) -> None:
+    raw = _three_scenarios(["Alpha one.", "Bravo two."])
+    st5 = [
+        *_response("A", "No problem."),
+        Delay(1.0),
+        *_response("B", "Acknowledge their feeling first, then say what you will fix."),
+    ]
+    st6 = _response("C", "Sure, here is the answer.")
+    h = Harness(
+        tmp_path,
+        raw,
+        [],
+        [GOOD] * 2,
+        tts=LetterTts(),
+        scripts=[st5, st6],
+        restamp=True,
+        real_time=True,
+    )
+    record = h.run()
+    assert record.cause is None
+    first, second = (r.transcript for r in h.judge.requests)
+    assert first == ("No problem. Acknowledge their feeling first, then say what you will fix.")
+    assert "No problem." not in second and "Acknowledge" not in second
+    assert second == "Sure, here is the answer."
+
+
+@pytest.mark.real_window
+def test_ac60_window_silence_counts_toward_budget(tmp_path: Path) -> None:
+    h = Harness(
+        tmp_path,
+        make_spec(),
+        [*_response("A", "Hi."), Delay(3.0)],
+        [GOOD],
+        tts=LetterTts(1.0),
+        restamp=True,
+        real_time=True,
+    )
+    record = h.run()
+    assert record.cause is None
+    assert record.input_audio_s >= 1.0 + 2.0 - 0.15
+
+
+@pytest.mark.real_window
+def test_ac59_ttfa_on_first_response_only(tmp_path: Path) -> None:
+    script = [
+        Delay(0.4),
+        _created("A"),
+        AudioDelta("A", 4800, 0.0),
+        ResponseDone("A", "completed", None, 0.0),
+        Delay(1.2),
+        _created("B"),
+        AudioDelta("B", 4800, 0.0),
+        ResponseDone("B", "completed", None, 0.0),
+        Delay(3.0),
+    ]
+    h = Harness(tmp_path, make_spec(), script, [GOOD], restamp=True, real_time=True)
+    record = h.run()
+    (turn,) = record.turns
+    assert turn.ttfa_ms is not None and abs(turn.ttfa_ms - 400.0) <= 50.0
+
+
+@pytest.mark.real_window
+def test_ac61_responses_per_turn_recorded_and_shown(tmp_path: Path) -> None:
+    raw = make_spec()
+    raw["scenarios"][0]["user_turns"] = [{"text": "Alpha one."}, {"text": "Bravo two."}]
+    script = [
+        *_response("A", "One."),
+        Delay(0.5),
+        *_response("B", "Two."),
+        Delay(2.6),  # past the window of turn 1
+        *_response("C", "Three."),
+        Delay(3.0),
+    ]
+    h = Harness(tmp_path, raw, script, [GOOD], tts=LetterTts(), restamp=True, real_time=True)
+    record = h.run()
+    assert [t.responses for t in record.turns] == [2, 1]
+    card = build_card(record)
+    assert [t.responses for t in card.raw_turns] == [2, 1]
+    text = render_card_text(card)
+    assert "responses per turn" in text.lower()
+    assert "s1 turn 1 = 2 (split)" in text and "s1 turn 2 = 1" in text

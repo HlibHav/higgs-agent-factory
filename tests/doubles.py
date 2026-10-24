@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+import dataclasses
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -39,9 +40,11 @@ class FakeSession:
         self,
         script: list[SessionEvent | Delay | Refuse] | None = None,
         clock: Clock = time.monotonic,
+        restamp: bool = False,
     ) -> None:
         self.script = list(script or [])
         self.clock = clock
+        self.restamp = restamp
         self.open_calls = 0
         self.closed = False
         self.sends: list[Sent] = []
@@ -66,6 +69,8 @@ class FakeSession:
                 await asyncio.sleep(item.seconds)
             elif isinstance(item, Refuse):
                 continue
+            elif self.restamp:
+                yield dataclasses.replace(item, t=self.clock())  # type: ignore[type-var]
             else:
                 yield item
 
@@ -78,15 +83,23 @@ class FakeSessionFactory:
         self,
         script: list[SessionEvent | Delay | Refuse] | None = None,
         clock: Clock = time.monotonic,
+        *,
+        scripts: list[list[SessionEvent | Delay | Refuse]] | None = None,
+        restamp: bool = False,
     ) -> None:
         self.script = script
+        self.scripts = scripts
         self.clock = clock
+        self.restamp = restamp
         self.calls = 0
         self.sessions: list[FakeSession] = []
 
     def __call__(self) -> FakeSession:
+        script = self.script
+        if self.scripts is not None and self.calls < len(self.scripts):
+            script = self.scripts[self.calls]
         self.calls += 1
-        session = FakeSession(self.script, self.clock)
+        session = FakeSession(script, self.clock, self.restamp)
         self.sessions.append(session)
         return session
 

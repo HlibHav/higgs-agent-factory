@@ -12,14 +12,24 @@ import pytest
 
 from factory.__main__ import main
 from factory.composition import ConfigError, FactoryApp, build_app
+from factory.gate import runner
 from factory.gate.card_builder import build_card
 from factory.gate.card_store import FileCardStore
 from factory.gate.records import EvalCard, GateRunRecord
-from factory.gate.runner import GateAborted
+from factory.gate.runner import GateAborted, preflight
 from factory.gate.tts_cache import TurnAudioSource
 from factory.runtime.boson_session import BosonRealtimeSession
-from tests.doubles import FakeJudge, FakeSessionFactory, FakeTts, Refuse
-from tests.fake_realtime_server import close, delay, fake_realtime_server, send, wait_for
+from tests.doubles import FakeJudge, FakeSessionFactory, FakeTts, Refuse, make_spec
+from tests.fake_realtime_server import (
+    audio_delta_event,
+    close,
+    delay,
+    fake_realtime_server,
+    response_done_event,
+    send,
+    transcript_delta_event,
+    wait_for,
+)
 
 SECRET_BOSON = "boson-secret-value-123"
 SECRET_ANTHROPIC = "anthropic-secret-value-456"
@@ -184,3 +194,36 @@ def test_wire_judge_api_error_is_aborted_without_leaking_message(
     assert "APIConnectionError" in result.error_text
     assert SECRET_ANTHROPIC not in result.error_text
     assert not (tmp_path / "cards").exists()
+
+
+def test_wire_one_connection_per_scenario(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(runner, "QUIET_WINDOW_S", 0.05)
+    raw = make_spec()
+    raw["scenarios"] = [raw["scenarios"][0], {**raw["scenarios"][0], "id": "s2", "title": "Two"}]
+    spec = preflight(raw)
+    good = '{"label": "PASS", "rationale": "ok", "evidence": "Hello"}'
+
+    def script(rid: str) -> list:
+        return [
+            wait_for("input_audio_buffer.append"),
+            send(audio_delta_event(rid)),
+            send(transcript_delta_event(rid, f"reply {rid}")),
+            send(response_done_event(rid)),
+            delay(3000),  # the server keeps the socket open; the runner closes it
+        ]
+
+    async def main_() -> Any:
+        async with fake_realtime_server(scripts=[script("r1"), script("r2")]) as (url, received):
+            app = _app(
+                tmp_path, lambda: BosonRealtimeSession(url=url, api_key="k"), FakeJudge([good] * 2)
+            )
+            card = await asyncio.wait_for(app._gate(spec), 20)
+            return card, list(received)
+
+    card, received = asyncio.run(main_())
+    assert isinstance(card, EvalCard)
+    updates = [r for r in received if r.event["type"] == "session.update"]
+    assert sorted(r.conn for r in updates) == [0, 1]
+    assert len(card.scenarios) == 2
+    stored = FileCardStore(tmp_path / "cards").latest("agent-1")
+    assert stored is not None and len(stored.scenarios) == 2

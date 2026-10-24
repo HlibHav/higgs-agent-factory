@@ -10,7 +10,7 @@ import asyncio
 import time
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -49,6 +49,9 @@ from factory.ports import (
 
 BYTES_PER_MS = BYTES_PER_S / 1000
 SILENCE_MAX_S = 8.0  # longest silence streamed after a turn while waiting for the reply
+QUIET_WINDOW_S: float = (
+    2.0  # AC-57: a turn ends this long after the last response; read at call time
+)
 
 _BUDGET_FIELDS = tuple(BudgetLimits.model_fields)
 
@@ -152,6 +155,7 @@ class _Interrupt:
 class _Reply:
     ttfa_ms: float | None = None
     text: str = ""
+    response_ids: list[str] = field(default_factory=list)  # in start order
     interrupt_last_chunk_t: float | None = None  # the interrupt turn was played during this reply
     bargein_ms: float | None = None
 
@@ -164,15 +168,25 @@ class _BudgetHit:
     """Queue marker: the audio budget was reached while the loop waited for an event."""
 
 
-class _MeteredSession:
-    """Counts input audio and raises once input + output reaches the per-run audio limit."""
+class _Meter:
+    """Run-wide audio count: input and output bytes of every scenario session (AC-56)."""
 
-    def __init__(self, session: RealtimeSession, limit_s: float, wake: asyncio.Queue[Any]) -> None:
-        self._session = session
+    def __init__(self, limit_s: float) -> None:
         self._limit_bytes = limit_s * BYTES_PER_S
-        self._wake = wake
         self.input_bytes = 0
         self.output_bytes = 0
+
+    def over_budget(self) -> bool:
+        return self.input_bytes + self.output_bytes >= self._limit_bytes
+
+
+class _MeteredSession:
+    """Counts input audio into the shared meter and raises once the per-run limit is hit."""
+
+    def __init__(self, session: RealtimeSession, meter: _Meter, wake: asyncio.Queue[Any]) -> None:
+        self._session = session
+        self._meter = meter
+        self._wake = wake
         self.first_send_t: float | None = None
         self._watching = False
 
@@ -182,17 +196,20 @@ class _MeteredSession:
         self._watching = True
 
     def over_budget(self) -> bool:
-        return self.input_bytes + self.output_bytes >= self._limit_bytes
+        return self._meter.over_budget()
+
+    def add_output(self, nbytes: int) -> None:
+        self._meter.output_bytes += nbytes
 
     async def open(self, spec: AgentSpec) -> None:
         await self._session.open(spec)
 
     async def send_audio(self, pcm: bytes) -> float:
         sent_at = await self._session.send_audio(pcm)
-        self.input_bytes += len(pcm)
+        self._meter.input_bytes += len(pcm)
         if self._watching:
             self.first_send_t, self._watching = sent_at, False
-        if self.over_budget():
+        if self._meter.over_budget():
             self._wake.put_nowait(_BudgetHit())  # wakes the loop if a silence task tripped it
             raise _BudgetReached
         return sent_at
@@ -207,32 +224,33 @@ class _MeteredSession:
         await self._session.close()
 
 
-class _Run:
-    def __init__(
-        self,
-        spec: AgentSpec,
-        session: RealtimeSession,
-        audio: TurnAudioSource,
-        judge: JudgePort,
-        sleep: Sleep,
-    ) -> None:
-        self.spec = spec
-        self.audio = audio
-        self.judge = judge
-        self.sleep = sleep
+class _ScenarioSession:
+    """What lives for one scenario (AC-55): its session, event queue, carry and pump."""
+
+    def __init__(self, factory: SessionFactory, meter: _Meter) -> None:
+        self._factory = factory
+        self._meter = meter
         self.queue: asyncio.Queue[Any] = asyncio.Queue()
-        self.session = _MeteredSession(session, spec.budget.max_audio_s_per_run, self.queue)
-        self.client_tools = {t.name: t for t in spec.tools if isinstance(t, ClientTool)}
-        self.scenarios: list[ScenarioRecord] = []
-        self.turns: list[TurnRecord] = []
-        self.usages: list[Usage | None] = []
-        self.cause: Cause | None = None
-        self.cause_detail: str | None = None
         self.carry: list[SessionEvent] = []  # events read early, replayed to the next reply
+        self.session: _MeteredSession | None = None
+        self._raw: RealtimeSession | None = None
         self._pump_task: asyncio.Task[None] | None = None
+
+    async def open(self, spec: AgentSpec) -> _MeteredSession:
+        raw = self._factory()
+        self._raw = raw
+        try:
+            await raw.open(spec)
+        except SessionRefused as exc:
+            await raw.close()
+            raise GateAborted(exc.error_text) from exc
+        self.session = _MeteredSession(raw, self._meter, self.queue)
+        self._pump_task = asyncio.create_task(self._pump())
+        return self.session
 
     async def _pump(self) -> None:
         """Read the session's events into a queue so the loop never misses a close."""
+        assert self.session is not None
         try:
             async for event in self.session.events():
                 self.queue.put_nowait(event)
@@ -243,13 +261,24 @@ class _Run:
             return
         self.queue.put_nowait(_End())
 
-    async def next_event(self) -> SessionEvent:
+    async def next_event(
+        self, timeout: float | None = None, *, in_window: bool = False
+    ) -> SessionEvent | None:
+        """The next event; None when `timeout` seconds pass first. Carry is drained first.
+        Inside the quiet window a finished stream also ends the wait (nothing more can come);
+        the end marker stays queued so the next read still aborts."""
         if self.carry:
             return self.carry.pop(0)
-        item = await self.queue.get()
+        try:
+            item = await asyncio.wait_for(self.queue.get(), timeout)
+        except TimeoutError:
+            return None
         if isinstance(item, _BudgetHit):
             raise _BudgetReached
         if isinstance(item, _End):
+            if in_window:
+                self.queue.put_nowait(item)
+                return None
             raise GateAborted("the session stream ended before the scenario finished")
         if isinstance(item, Exception):
             raise item
@@ -259,19 +288,58 @@ class _Run:
             raise _Stop(item.cause, item.error_text)
         return item
 
+    async def shutdown(self) -> None:
+        if self._pump_task is not None:
+            self._pump_task.cancel()
+            await asyncio.gather(self._pump_task, return_exceptions=True)
+        if self._raw is not None:
+            await self._raw.close()
+
+
+class _Run:
+    def __init__(
+        self,
+        spec: AgentSpec,
+        sessions: SessionFactory,
+        audio: TurnAudioSource,
+        judge: JudgePort,
+        sleep: Sleep,
+    ) -> None:
+        self.spec = spec
+        self.sessions = sessions
+        self.audio = audio
+        self.judge = judge
+        self.sleep = sleep
+        self.meter = _Meter(spec.budget.max_audio_s_per_run)
+        self.client_tools = {t.name: t for t in spec.tools if isinstance(t, ClientTool)}
+        self.scenarios: list[ScenarioRecord] = []
+        self.turns: list[TurnRecord] = []
+        self.usages: list[Usage | None] = []
+        self.cause: Cause | None = None
+        self.cause_detail: str | None = None
+        self._current: _ScenarioSession | None = None
+
+    @property
+    def scenario_session(self) -> _ScenarioSession:
+        assert self._current is not None
+        return self._current
+
+    @property
+    def session(self) -> _MeteredSession:
+        assert self._current is not None and self._current.session is not None
+        return self._current.session
+
+    async def next_event(
+        self, timeout: float | None = None, *, in_window: bool = False
+    ) -> SessionEvent | None:
+        return await self.scenario_session.next_event(timeout, in_window=in_window)
+
     async def execute(self) -> None:
-        self._pump_task = asyncio.create_task(self._pump())
         try:
             for scenario in self.spec.scenarios:
                 await self._scenario(scenario)
         except _Stop as stop:
             self.cause, self.cause_detail = stop.cause, stop.detail
-
-    async def shutdown(self) -> None:
-        if self._pump_task is not None:
-            self._pump_task.cancel()
-            await asyncio.gather(self._pump_task, return_exceptions=True)
-        await self.session.close()
 
     async def _audio(
         self, scenario: Scenario, index: int, cache: dict[int, tuple[bytes, str]]
@@ -288,6 +356,15 @@ class _Run:
         return cache[index]
 
     async def _scenario(self, scenario: Scenario) -> None:
+        current = _ScenarioSession(self.sessions, self.meter)
+        self._current = current
+        try:
+            await current.open(self.spec)
+            await self._scenario_turns(scenario)
+        finally:
+            await current.shutdown()  # a late response dies with its session
+
+    async def _scenario_turns(self, scenario: Scenario) -> None:
         texts: list[str] = []
         calls: list[ToolCall] = []
         sources: set[str] = set()
@@ -305,7 +382,16 @@ class _Run:
                 interrupt = _Interrupt(next_pcm, turns[index + 1].interrupt_after_assistant_ms or 0)
             reply = await self._exchange(pcm, calls, interrupt=interrupt, played_at=played_at)
             texts.append(reply.text)
-            new_turns.append(TurnRecord(scenario.id, index, "scripted", reply.ttfa_ms, *barge_in))
+            new_turns.append(
+                TurnRecord(
+                    scenario.id,
+                    index,
+                    "scripted",
+                    reply.ttfa_ms,
+                    *barge_in,
+                    responses=len(reply.response_ids),
+                )
+            )
             played_at = reply.interrupt_last_chunk_t
             if interrupt is None:
                 barge_in = (None, None)
@@ -371,26 +457,47 @@ class _Run:
         interrupt: "_Interrupt | None",
     ) -> "_Reply":
         reply = _Reply()
-        parts: list[str] = []
+        texts: dict[str, list[str]] = {}
         follow_up = False  # a client tool was answered, so another response is coming
         heard_ms: dict[str, float] = {}
         interrupted: str | None = None  # response id the interrupt turn was played over
         last_delta_t = 0.0
         play_task: asyncio.Task[float] | None = None
+        window_end: float | None = None  # AC-57: the quiet window runs until this loop time
+        window_stop = asyncio.Event()
+        window_task: asyncio.Task[None] | None = None
+        loop = asyncio.get_running_loop()
+
+        async def close_window() -> None:
+            nonlocal window_end, window_task
+            window_end = None
+            window_stop.set()
+            if window_task is not None:
+                await asyncio.gather(window_task, return_exceptions=True)
+                window_task = None
+
         try:
             while True:
-                event = await self.next_event()
+                timeout = None if window_end is None else max(0.0, window_end - loop.time())
+                event = await self.next_event(timeout, in_window=window_end is not None)
+                if event is None:
+                    break  # the quiet window elapsed: the turn is over
                 rid = getattr(event, "response_id", None)
                 if interrupted is not None and rid not in (None, interrupted):
-                    self.carry.append(event)  # belongs to the reply to the interrupt turn
+                    self.scenario_session.carry.append(event)  # reply to the interrupt turn
                     continue
+                if rid is not None and rid not in texts:  # F17: a new response starts here
+                    texts[rid] = []
+                    reply.response_ids.append(rid)
+                    if window_end is not None:
+                        await close_window()
                 if isinstance(event, AudioDelta):
-                    self.session.output_bytes += event.nbytes
+                    self.session.add_output(event.nbytes)
                     if self.session.over_budget():
                         raise _BudgetReached
-                    if reply.ttfa_ms is None:
+                    if reply.ttfa_ms is None and event.response_id == reply.response_ids[0]:
                         reply.ttfa_ms = ttfa_ms(last_chunk_t, event.t)  # F17
-                        stop.set()
+                    stop.set()
                     heard_ms[event.response_id] = (
                         heard_ms.get(event.response_id, 0.0) + event.nbytes / BYTES_PER_MS
                     )
@@ -407,7 +514,7 @@ class _Run:
                     if interrupted == event.response_id:
                         last_delta_t = event.t
                 elif isinstance(event, TranscriptDelta):
-                    parts.append(event.text)
+                    texts[event.response_id].append(event.text)  # F18
                 elif isinstance(event, ToolCall):
                     calls.append(event)
                     tool = self.client_tools.get(event.name)
@@ -416,6 +523,8 @@ class _Run:
                             event.call_id, select_mock(tool, event.arguments)
                         )
                         follow_up = True
+                        if window_end is not None:
+                            await close_window()  # the follow-up is awaited without a timeout
                 elif isinstance(event, ResponseDone):
                     self.usages.append(event.usage)
                     if interrupted is not None and play_task is not None:
@@ -425,14 +534,26 @@ class _Run:
                             reply.bargein_ms = (last_delta_t - mark) * 1000.0
                         break
                     if not follow_up:
-                        break
-                    follow_up = False
-                # SpeechStarted, SpeechStopped, OtherEvent: ignored (F5, AC-24)
+                        stop.set()  # no more waiting-for-reply silence
+                        await close_window()
+                        window_stop.clear()
+                        window_end = loop.time() + QUIET_WINDOW_S
+                        window_task = asyncio.create_task(
+                            stream_silence_until(
+                                self.session, window_stop, QUIET_WINDOW_S, sleep=self.sleep
+                            )
+                        )
+                    else:
+                        follow_up = False
+                # ResponseCreated, SpeechStarted, SpeechStopped, OtherEvent: no action (F5, AC-24)
         finally:
+            window_stop.set()
+            if window_task is not None:
+                await asyncio.gather(window_task, return_exceptions=True)
             if play_task is not None and not play_task.done():
                 play_task.cancel()
                 await asyncio.gather(play_task, return_exceptions=True)
-        reply.text = "".join(parts)
+        reply.text = " ".join(t for t in ("".join(texts[r]) for r in reply.response_ids) if t)
         return reply
 
     def record(self, agent_id: str) -> GateRunRecord:
@@ -444,8 +565,8 @@ class _Run:
             scenarios=self.scenarios,
             turns=self.turns,
             usages=self.usages,
-            input_audio_s=self.session.input_bytes / BYTES_PER_S,
-            output_audio_s=self.session.output_bytes / BYTES_PER_S,
+            input_audio_s=self.meter.input_bytes / BYTES_PER_S,
+            output_audio_s=self.meter.output_bytes / BYTES_PER_S,
             cause=self.cause,
             cause_detail=self.cause_detail,
         )
@@ -460,22 +581,14 @@ async def run_gate(
     clock: Clock = time.monotonic,
     sleep: Sleep = asyncio.sleep,
 ) -> GateRunRecord:
-    """One session per run. A cut-short run returns a record with `cause` set; a refused
-    session raises `GateAborted` and yields no record (AC-20).
+    """One session per scenario (AC-55), one audio meter for the run (AC-56). A cut-short run
+    returns a record with `cause` set; a refused session raises `GateAborted` and yields no
+    record (AC-20).
 
     `clock` is accepted for the plan's signature; every timestamp the loop needs (send times,
     event times) comes from the session, so it is not read here.
     """
     check_limits(spec)
-    session = sessions()
-    try:
-        await session.open(spec)
-    except SessionRefused as exc:
-        await session.close()
-        raise GateAborted(exc.error_text) from exc
-    run = _Run(spec, session, audio, judge, sleep)
-    try:
-        await run.execute()
-    finally:
-        await run.shutdown()
+    run = _Run(spec, sessions, audio, judge, sleep)
+    await run.execute()
     return run.record(spec.id)

@@ -43,6 +43,13 @@ def render_card_text(card: EvalCard) -> str:
             f"Barge-in stop time p50 {_ms(card.bargein_p50_ms)}, "
             f"{card.bargein_tail_kind} {_ms(card.bargein_tail_ms)}"
         )
+    if card.raw_turns:
+        counts = ", ".join(
+            f"{t.scenario_id} turn {t.turn_index + 1} = {t.responses}"
+            + (" (split)" if t.responses > 1 else "")
+            for t in card.raw_turns
+        )
+        lines.append(f"Responses per turn: {counts}")
     lines.append(
         f"Audio: {card.input_audio_minutes:.2f} min in, {card.output_audio_minutes:.2f} min out"
     )

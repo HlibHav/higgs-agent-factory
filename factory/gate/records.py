@@ -36,6 +36,7 @@ class TurnRecord:
     ttfa_ms: float | None
     bargein_ms: float | None
     bargein_status: Literal["measured", "not measured"] | None
+    responses: int = 1  # responses inside the turn's quiet window (AC-61)
 
 
 @dataclass(frozen=True)

@@ -137,3 +137,12 @@ def test_same_second_runs_distinct_ids():
     a, b = new_run_id(now), new_run_id(now)
     assert a != b
     assert re.fullmatch(r"20261024T120000Z-[0-9a-f]{8}", a)
+
+
+def test_card_roundtrip_keeps_responses(tmp_path: Path):
+    record = _record()
+    record.turns[0] = TurnRecord("s0", 0, "scripted", 100.0, None, None, responses=2)
+    store = FileCardStore(tmp_path)
+    store.save(build_card(record))
+    back = store.latest("a1")
+    assert back is not None and back.raw_turns[0].responses == 2

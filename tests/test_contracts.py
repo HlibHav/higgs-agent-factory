@@ -124,3 +124,26 @@ def test_other_doubles_count_calls() -> None:
     assert tts.requests == [("hi", "chloe"), ("bad", "chloe")]
     assert brief.calls == 1
     assert judge.requests == []
+
+
+def test_fake_server_scripts_per_connection() -> None:
+    async def scenario() -> tuple[list[list[str]], list[int]]:
+        a = [wait_for("session.update"), send({"type": "x.a"}), delay(50), close(1000)]
+        b = [wait_for("session.update"), send({"type": "x.b"}), delay(50), close(1000)]
+        async with fake_realtime_server(scripts=[a, b]) as (url, received):
+            seen: list[list[str]] = []
+            for _ in range(2):
+                async with websockets.connect(url) as ws:
+                    await ws.send(json.dumps({"type": "session.update", "session": {}}))
+                    types: list[str] = []
+                    try:
+                        async for raw in ws:
+                            types.append(json.loads(raw)["type"])
+                    except websockets.ConnectionClosed:
+                        pass
+                    seen.append(types)
+            return seen, [r.conn for r in received]
+
+    seen, conns = asyncio.run(scenario())
+    assert seen == [["session.created", "x.a"], ["session.created", "x.b"]]
+    assert conns == [0, 1]

@@ -1,5 +1,7 @@
 """Solution templates (step 7). Deterministic, no model call."""
 
+import re
+
 import pytest
 
 from factory.agent_spec.models import AgentSpec, TemplateSource
@@ -85,3 +87,45 @@ def test_load_template_returns_independent_copies() -> None:
     a = load_template("specialist-training")
     a.scenarios.clear()
     assert len(load_template("specialist-training").scenarios) == 6
+
+
+_ST5_RUBRIC = {
+    "pass_criteria": [
+        "The assistant stops its first answer when interrupted, so the first answer in the "
+        "transcript ends early or mid-sentence.",
+        "The answer to the second question says to acknowledge the feeling first, then say "
+        "what will be done.",
+        "The answer to the second question is at most two sentences.",
+    ],
+    "partial_criteria": [
+        "The answer to the second question is correct, but the first answer continues to its "
+        "end as if there was no interruption.",
+        "The answer to the second question is correct but ignores the order (feeling first, "
+        "then action).",
+    ],
+    "fail_criteria": [
+        "The assistant ignores the second question and keeps talking about the first.",
+        "The answer to the second question puts the fix before acknowledging the feeling.",
+    ],
+}
+
+
+def test_no_scripted_turn_has_an_internal_sentence_break() -> None:
+    # Scoped to the interrupting turns: st-1..4 and st-6 are single first turns whose
+    # two-sentence wording the live run did not split (see implementer report).
+    spec = load_template("specialist-training")
+    checked = 0
+    for scenario in spec.scenarios:
+        for turn in scenario.user_turns:
+            if turn.interrupt_after_assistant_ms is None:
+                continue
+            checked += 1
+            assert re.search(r"[.?!\u2026](?=.)", turn.text.strip()) is None, turn.text
+    assert checked >= 1
+
+
+def test_st5_rubric_unchanged() -> None:
+    spec = load_template("specialist-training")
+    st5 = next(s for s in spec.scenarios if s.id == "st-5")
+    assert st5.rubric.model_dump() == _ST5_RUBRIC
+    assert st5.user_turns[1].interrupt_after_assistant_ms == 1500

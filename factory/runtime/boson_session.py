@@ -31,6 +31,7 @@ from factory.ports import (
     AudioDelta,
     Clock,
     OtherEvent,
+    ResponseCreated,
     ResponseDone,
     SessionEnded,
     SessionEvent,
@@ -239,6 +240,10 @@ class BosonRealtimeSession:
             return [
                 TranscriptDelta(str(event.get("response_id", "")), str(event.get("delta", "")), t)
             ]
+        if kind == "response.created":  # F17
+            response = event.get("response")
+            response = response if isinstance(response, dict) else {}
+            return [ResponseCreated(str(response.get("id", "")), t)]
         if kind == "response.done":  # F2, F17
             response = event.get("response")
             response = response if isinstance(response, dict) else {}
