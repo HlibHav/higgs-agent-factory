@@ -195,9 +195,7 @@ class FactoryApp:
             raise KeyError(scenario_id)
         stored = self.latest_card(agent_id)
         try:
-            checked = preflight(
-                spec.model_copy(update={"scenarios": [scenario]}).model_dump(mode="json")
-            )
+            checked = preflight(spec.with_scenarios([scenario]).model_dump(mode="json"))
             record = await run_gate(
                 checked, sessions=self.sessions, audio=self.audio, judge=self.judge
             )

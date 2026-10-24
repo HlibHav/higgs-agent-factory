@@ -41,7 +41,7 @@ def test_ac5_specialist_training_budget() -> None:
     budget = load_template("specialist-training").budget
     assert budget.max_scenarios == 6
     assert budget.max_audio_s_per_run == 240  # 4 minutes, input plus output
-    assert budget.max_judge_calls_per_scenario == 1
+    assert budget.max_judge_calls_per_scenario == 2  # AC-75: judge agreement
     assert budget.max_live_session_s == 180  # 3 minutes
 
 

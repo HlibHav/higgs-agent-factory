@@ -23,9 +23,11 @@ def decide_verdict(record: GateRunRecord) -> tuple[Verdict, list[FailingScenario
             rubric=s.rubric,
             rationale=s.judgment.rationale,
             evidence=s.judgment.evidence,
+            skill_id=s.skill_id,
+            judge_agreed=s.judge_agreed,
         )
         for s in record.scenarios
-        if s.judgment is not None and s.judgment.label != "PASS"
+        if s.judgment is not None and not s.passed  # AC-74, AC-75: disagreed PASS fails
     ]
     if failing:
         return "rejected", failing

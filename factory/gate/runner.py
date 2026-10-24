@@ -22,7 +22,7 @@ from factory.agent_spec.models import (
     Scenario,
 )
 from factory.agent_spec.validation import validate_agent_spec
-from factory.gate.judge import judge_scenario_outcome
+from factory.gate.judge import judge_scenario_agreed
 from factory.gate.playback import BYTES_PER_S, Sleep, play_turn, stream_silence_until, ttfa_ms
 from factory.gate.records import (
     Cause,
@@ -405,8 +405,10 @@ class _Run:
             transcript="\n".join(texts),
             tool_calls=list(calls),
         )
-        outcome = await judge_scenario_outcome(self.judge, request)  # exactly one call
+        k = max(1, self.spec.budget.max_judge_calls_per_scenario)  # AC-75, within budget
+        outcome = await judge_scenario_agreed(self.judge, request, k)
         judgment = outcome.judgment
+        skill = self.spec.skill_of(scenario.id)
         expected = scenario.expected_tool_call
         self.scenarios.append(
             ScenarioRecord(
@@ -423,6 +425,10 @@ class _Run:
                 judge_raw_reply=outcome.raw_reply if judgment is None else None,
                 judge_raw_truncated=outcome.raw_truncated if judgment is None else False,
                 transcript_chars=len(request.transcript) if judgment is None else None,
+                skill_id=skill.id if skill else "main",
+                skill_name=skill.name if skill else "Main",
+                judge_labels=outcome.labels,
+                judge_agreed=outcome.agreed,
             )
         )
         if judgment is None:
@@ -574,6 +580,8 @@ class _Run:
             output_audio_s=self.meter.output_bytes / BYTES_PER_S,
             cause=self.cause,
             cause_detail=self.cause_detail,
+            agent_version=self.spec.version,
+            agent_spec=self.spec.model_dump(mode="json"),
         )
 
 

@@ -240,7 +240,7 @@ def test_ac53_single_check_marked_and_stored_card_unchanged(
     monkeypatch.setattr(runner, "QUIET_WINDOW_S", 0.05)
     card, path = _store_card(tmp_path, AGENT, "FAIL")
     before = path.read_bytes()
-    judge = FakeJudge([GOOD])
+    judge = FakeJudge([GOOD, GOOD])
     sessions = FakeSessionFactory(_check_script(), restamp=True)
     client = _client(_app(tmp_path, sessions=sessions, judge=judge))
     scenario_id = load_template(AGENT).scenarios[0].id
@@ -252,7 +252,7 @@ def test_ac53_single_check_marked_and_stored_card_unchanged(
     assert (body["label"], body["rationale"], body["evidence"]) == ("PASS", "answered", "Hello")
     assert body["scenario_id"] == scenario_id and body["stored_verdict"] == "rejected"
     assert body["ttfa_ms"] is not None
-    assert sessions.calls == 1 and len(judge.requests) == 1  # exactly this scenario
+    assert sessions.calls == 1 and len(judge.requests) == 2  # this scenario, k = 2 (AC-75)
     assert path.read_bytes() == before  # file untouched
     assert sorted(p.name for p in path.parent.iterdir()) == [path.name]  # and nothing new
     latest = client.get(f"/api/agents/{AGENT}/card/latest").json()["card"]
@@ -411,7 +411,7 @@ def test_ac37_no_key_in_any_response_or_message(tmp_path: Path) -> None:
     ]
     built.live_sessions = FakeSessionFactory(script)
     built.sessions = FakeSessionFactory(_check_script(), restamp=True)
-    built.judge = FakeJudge([GOOD])
+    built.judge = FakeJudge([GOOD, GOOD])
     client = _client(built, index_path=page)
     bodies = [client.get("/").text]
     paths = [

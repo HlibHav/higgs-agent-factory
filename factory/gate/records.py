@@ -1,8 +1,8 @@
 """Gate run records and the Eval Card (domain). No SDK imports."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -54,6 +54,20 @@ class ScenarioRecord:
     judge_raw_reply: str | None = None
     judge_raw_truncated: bool = False
     transcript_chars: int | None = None
+    skill_id: str = "main"
+    skill_name: str = "Main"
+    # AC-75: every valid label of the k judge calls; agreed is False when they differ or one
+    # reply was invalid. A disagreed scenario never counts as PASS.
+    judge_labels: list[Label] = field(default_factory=list)
+    judge_agreed: bool | None = None
+
+    @property
+    def passed(self) -> bool:
+        return (
+            self.judgment is not None
+            and self.judgment.label == "PASS"
+            and self.judge_agreed is not False
+        )
 
 
 @dataclass(frozen=True)
@@ -68,6 +82,21 @@ class GateRunRecord:
     output_audio_s: float
     cause: Cause | None
     cause_detail: str | None
+    agent_version: int = 1
+    agent_spec: dict[str, Any] | None = None  # the spec that ran, so a coached version reloads
+
+
+class SkillResult(BaseModel):
+    """AC-74: one skill's share of a gate run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    skill_id: str
+    name: str
+    scenarios_run: int
+    passed: int
+    pass_rate: float | None
+    released: bool
 
 
 class FailingScenario(BaseModel):
@@ -80,6 +109,8 @@ class FailingScenario(BaseModel):
     rubric: Rubric
     rationale: str
     evidence: str
+    skill_id: str = "main"
+    judge_agreed: bool | None = None
 
 
 class IhbenchRq(BaseModel):
@@ -126,3 +157,9 @@ class EvalCard(BaseModel):
     measured_token_cost_label: str | None = None
     token_cost_text: str | None = None  # AC-31 text when any response lacked usage
     raw_turns: list[TurnRecord]
+    skills: list[SkillResult] = []
+    judge_agreement_rate: float | None = None
+    agent_version: int = 1
+    parent_run_id: str | None = None  # the run the coach started from (AC-76)
+    coach_note: str | None = None
+    agent_spec: dict[str, Any] | None = None

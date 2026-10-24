@@ -18,6 +18,21 @@ def render_card_text(card: EvalCard) -> str:
             lines.append(f"Detail: {card.cause_detail}")
     rate = "n/a" if card.pass_rate is None else f"{card.pass_rate * 100:.0f}%"
     lines.append(f"Scenarios run: {card.scenarios_run}, pass rate: {rate}")
+    if card.agent_version > 1 or card.parent_run_id:
+        lines.append(f"Agent version: {card.agent_version} (coached from run {card.parent_run_id})")
+    for sk in card.skills:
+        word = "passed" if sk.released else "not passed"
+        lines.append(
+            f"Skill {sk.name} ({sk.skill_id}): {sk.passed}/{sk.scenarios_run} PASS, {word}"
+        )
+    if card.judge_agreement_rate is not None:
+        lines.append(f"Judge agreement: {card.judge_agreement_rate * 100:.0f}% of judged scenarios")
+    for sc in card.scenarios:
+        if sc.judge_agreed is False:
+            lines.append(
+                f"Scenario {sc.scenario_id}: judge disagreed ({', '.join(sc.judge_labels)}); "
+                "not counted as PASS"
+            )
     for f in card.failing_rubric_lines:
         lines.append(f"Failing scenario {f.scenario_id}: {f.label}")
         lines.append(f"  Pass: {'; '.join(f.rubric.pass_criteria)}")

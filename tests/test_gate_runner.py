@@ -207,7 +207,7 @@ def test_one_judge_call_per_scenario_budget(tmp_path: Path) -> None:
 def test_run_gate_rechecks_limits_before_opening_a_session(tmp_path: Path) -> None:
     raw = two_scenarios()
     h = Harness(tmp_path, raw, [], [])
-    over = h.spec.model_copy(update={"scenarios": h.spec.scenarios * 4})
+    over = h.spec.with_scenarios(h.spec.scenarios * 4)
     with pytest.raises(GateRefused):
         asyncio.run(run_gate(over, sessions=h.factory, audio=h.audio, judge=h.judge))
     assert h.factory.calls == 0
