@@ -41,11 +41,10 @@ Last refreshed: 2026-10-24T19:05:00Z by the setup session (Claude Code) on `docs
 ## Submitted
 
 - Hackathon form submitted by Glib, 2026-10-24: track Agents That Act, judged tag `hackathon-submission` = `68b66ba`. The demo video field points at README `#demo-video`.
-- Demo film recorded and linked, 2026-10-24: 163.9 s, 1920×1080, −16.0 LUFS, take 1 of run `20261024T203615Z-34b33d` (narrator `eleanor`, caller `jake`, both Higgs TTS 3), recorded unattended. The video is a GitHub user-attachment embedded at the top of README and in `#demo-video`; the file itself is not in Git. Recorder: draft PR https://github.com/HlibHav/higgs-agent-factory/pull/2 (`feat/demo-film`, spec `specs/2026-10-24-demo-film.md`).
+- Demo film recorded and linked, 2026-10-24: 163.9 s, 1920×1080, −16.0 LUFS, take 1 of run `20261024T203615Z-34b33d` (narrator `eleanor`, caller `jake`, both Higgs TTS 3), recorded unattended. The video is a GitHub user-attachment embedded at the top of README and in `#demo-video`; the file itself is not in Git. Recorder: PR https://github.com/HlibHav/higgs-agent-factory/pull/2 merged into `main` as `ecbd426` (spec `specs/2026-10-24-demo-film.md`; run with `uv run python -m factory.film --help`).
 
 ## Blocked (Glib)
 
-- Review and merge the demo-film recorder PR (HlibHav/higgs-agent-factory#2).
 - Review the four template rubrics before any of them is shown.
 
 ## Next
