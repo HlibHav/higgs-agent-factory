@@ -4,6 +4,8 @@ Insert-only. Format and rules: `engineering-paved-path:engineering-insights` (`r
 
 ## What Works
 
+- 2026-10-24: A server-VAD barge-in ends the interrupted response `cancelled`, like a client `response.cancel` (F28): live gate `20261024T171443Z-35b3f15b` measured barge-in 117 ms under the AC-29 rule.
+
 - 2026-10-24: The live page proxies browser PCM through one FastAPI WebSocket with a single writer queue; a scripted client with cached TTS audio is a cheap end-to-end check of `/ws/live/<agent>` before touching a mic (`docs/DEMO-RUNBOOK.md`).
 
 ## What Doesn't Work
